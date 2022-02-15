@@ -1,0 +1,23 @@
+---
+title: "Final Project Code"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidymodels)
+tidymodels_prefer()
+
+games <- read_csv("vgsales-12-4-2019-short.csv")
+```
+
+```{r}
+Games = subset(games, select = -c(`JP_Sales`, `NA_Sales`, `Other_Sales`, `Global_Sales`))
+```
