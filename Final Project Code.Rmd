@@ -7,7 +7,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
 ```{r}
 library(readr)
 library(ggplot2)
@@ -15,9 +14,96 @@ library(dplyr)
 library(tidymodels)
 tidymodels_prefer()
 
-games <- read_csv("vgsales-12-4-2019-short.csv")
+Titanic <- read_csv("train.csv")
 ```
 
 ```{r}
-Games = subset(games, select = -c(`JP_Sales`, `NA_Sales`, `Other_Sales`, `Global_Sales`))
+Titanic_clean <- Titanic %>% 
+  select(Survived, Pclass, Sex, Age, SibSp, Parch, Fare, Embarked)
+
+Titanic_clean
 ```
+
+```{r}
+Titanic_clean_5 <- vfold_cv(Titanic_clean, v = 5)
+```
+
+```{r}
+lm_spec <-
+    linear_reg() %>%
+    set_engine(engine = "lm") %>% 
+    set_mode("regression")
+
+lm_lasso_spec <- 
+  linear_reg() %>%
+  set_args(mixture = 1, penalty = tune()) %>%
+  set_engine(engine = 'glmnet') %>%
+  set_mode('regression') 
+```
+
+```{r}
+data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
+    step_nzv(all_predictors()) %>% 
+    step_novel(all_nominal_predictors()) %>% 
+    step_normalize(all_numeric_predictors()) %>% 
+    step_dummy(all_nominal_predictors())  
+
+lm_wf <- workflow() %>%
+  add_recipe(data_rec) %>%
+  add_model(lm_spec) 
+
+lm_lasso_wf <- workflow() %>% 
+  add_recipe(data_rec) %>%
+  add_model(lm_lasso_spec)
+```
+
+```{r}
+
+```
+
+```{r}
+lm_result_5 <- fit_resamples(lm_wf,
+                             resamples = Titanic_clean_5, 
+                             metrics = metric_set(rmse, rsq, mae))
+  
+lm_result_5 %>% unnest(.metrics) %>%
+  filter(.metric == 'rsq') %>%
+  summarize(mean(.estimate))
+
+lm_result_5 %>% collect_metrics()
+```
+
+```{r}
+penalty_grid <- grid_regular(
+  penalty(range = c(-5, 3)), #log10 transformed 10^-5 to 10^3
+  levels = 30)
+
+tune_res <- tune_grid( # new function for tuning parameters
+  lm_lasso_wf, # workflow
+  resamples = Titanic_clean_5, # cv folds
+  metrics = metric_set(rmse, mae),
+  grid = penalty_grid # penalty grid defined above
+)
+
+# Visualize Model Evaluation Metrics from Tuning
+autoplot(tune_res) + theme_classic()
+
+# Summarize Model Evaluation Metrics (CV)
+collect_metrics(tune_res) %>%
+  filter(.metric == 'rmse') %>% # or choose mae
+  select(penalty, rmse = mean) 
+
+best_penalty <- select_best(tune_res, metric = 'rmse') # choose penalty value based on lowest mae or rmse
+
+# Fit Final Model
+final_wf <- finalize_workflow(lm_lasso_wf, best_penalty) # incorporates penalty value to workflow
+
+final_fit <- fit(final_wf, data = Titanic_clean)
+
+tidy(final_fit)
+```
+
+
+
+
+
