@@ -54,10 +54,11 @@ lm_lasso_spec <-
 ```{r}
 # recipes
 data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
-    step_nzv(all_predictors()) %>% 
-    step_novel(all_nominal_predictors()) %>% 
-    step_normalize(all_numeric_predictors()) %>% 
-    step_dummy(all_nominal_predictors())  
+  step_nzv(all_predictors()) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors())
+  #step_corr(all_predictors())
 
 # workflows
 lm_wf <- workflow() %>%
@@ -73,10 +74,6 @@ lm_lasso_wf <- workflow() %>%
 # fit & tune models
 fit_lm_model <- fit(lm_wf, Titanic_clean)
 tidy(fit_lm_model)
-
-fit_lasso_model <- fit(lm_lasso_wf, Titanic_clean)
-plot(fit_lasso_model%>% extract_fit_parsnip() %>% pluck('fit'),
-     xvar = "lambda") # pick a lambda?
 ```
 
 c.
@@ -88,12 +85,13 @@ lm_result_5 <- fit_resamples(lm_wf,
                              resamples = Titanic_clean_5, 
                              metrics = metric_set(rmse, rsq, mae))
 
-lm_result_5 %>% collect_metrics()
+collect_metrics(lm_result_5)
+
 
 #  for LASSO
 penalty_grid <- grid_regular(
-  penalty(range = c(-5, 3)),
-  levels = 5) # levels = ???
+  penalty(range = c(-3, 3)),
+  levels = 20)
 
 tune_res <- tune_grid(
   lm_lasso_wf, 
@@ -112,7 +110,7 @@ final_fit <- fit(final_wf, data = Titanic_clean)
 
 tidy(final_fit)
 
-tune_res %>% collect_metrics() ## ???
+tune_res %>% collect_metrics()
 ```
 
 
@@ -121,12 +119,23 @@ d.
 
 ```{r}
 #  visual residuals
-lm_model_output <- lm_result_5 %>% 
+lm_model_output <- fit_lm_model %>% 
     predict(new_data = Titanic_clean) %>%
     bind_cols(Titanic_clean) %>%
     mutate(resid = Fare - .pred)
 
-ggplot(fit_lasso_model, aes(x = .pred, y = resid)) +
+ggplot(lm_model_output, aes(x = .pred, y = resid)) +
+    geom_point() +
+    geom_smooth() +
+    geom_hline(yintercept = 0, color = "red") +
+    theme_classic()
+
+lasso_model_output <- final_fit %>% 
+    predict(new_data = Titanic_clean) %>%
+    bind_cols(Titanic_clean) %>%
+    mutate(resid = Fare - .pred)
+
+ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
     geom_point() +
     geom_smooth() +
     geom_hline(yintercept = 0, color = "red") +
