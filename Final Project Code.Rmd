@@ -91,7 +91,7 @@ collect_metrics(lm_result_5)
 #  for LASSO
 penalty_grid <- grid_regular(
   penalty(range = c(-3, 3)),
-  levels = 20)
+  levels = 10) #????
 
 tune_res <- tune_grid(
   lm_lasso_wf, 
@@ -110,10 +110,10 @@ final_fit <- fit(final_wf, data = Titanic_clean)
 
 tidy(final_fit)
 
-tune_res %>% collect_metrics()
+tune_res %>% collect_metrics(summarize = TRUE) %>% 
+  filter(.metric == "rmse") %>% 
+  summarize(mean = mean(mean)) # Get p.value for LASSO model ????
 ```
-
-
 
 d.
 
@@ -144,4 +144,6 @@ ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
 
 e.
 
+2. We would go with the orinary least square model, as it has lower RMSE than the LASSO model. The predict accuracies of two models seem not to be reliable as the RMSE values for both models are quite high, considering the scale of the response variable.
 
+3.They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
