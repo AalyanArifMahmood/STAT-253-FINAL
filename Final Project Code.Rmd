@@ -15,7 +15,6 @@ library(readr)
 library(ggplot2)
 library(dplyr)
 library(tidymodels)
-library(corrr)
 tidymodels_prefer()
 
 set.seed(123)
@@ -30,9 +29,7 @@ Titanic_clean <- Titanic %>%
   select(Survived, Pclass, Sex, Age, SibSp, Parch, Fare, Embarked) %>% 
     na.omit()
 
-Titanic_clean %>% 
-  select(-Sex, -Embarked) %>% 
-  correlate()
+Titanic_clean
 ```
 
 ```{r}
