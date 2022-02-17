@@ -15,6 +15,7 @@ library(readr)
 library(ggplot2)
 library(dplyr)
 library(tidymodels)
+library(corrr)
 tidymodels_prefer()
 
 set.seed(123)
@@ -29,7 +30,9 @@ Titanic_clean <- Titanic %>%
   select(Survived, Pclass, Sex, Age, SibSp, Parch, Fare, Embarked) %>% 
     na.omit()
 
-Titanic_clean
+Titanic_clean %>% 
+  select(-Sex, -Embarked) %>% 
+  correlate()
 ```
 
 ```{r}
@@ -55,10 +58,9 @@ lm_lasso_spec <-
 # recipes
 data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
   step_nzv(all_predictors()) %>% 
-  step_novel(all_nominal_predictors()) %>% 
   step_normalize(all_numeric_predictors()) %>% 
-  step_dummy(all_nominal_predictors())
-  #step_corr(all_predictors())
+  step_dummy(all_nominal_predictors()) %>% 
+  step_corr(all_numeric_predictors())
 
 # workflows
 lm_wf <- workflow() %>%
@@ -74,6 +76,30 @@ lm_lasso_wf <- workflow() %>%
 # fit & tune models
 fit_lm_model <- fit(lm_wf, Titanic_clean)
 tidy(fit_lm_model)
+
+lm_lasso_fit <- lm_lasso_wf %>% 
+  fit(data = Titanic_clean)
+
+glmnet_output <- lm_lasso_fit %>% extract_fit_parsnip() %>% pluck('fit') # way to get the original glmnet output
+
+lambdas <- glmnet_output$lambda
+coefs_lambdas <- 
+  coefficients(glmnet_output, s = lambdas )  %>% 
+  as.matrix() %>%  
+  t() %>% 
+  as.data.frame() %>% 
+  mutate(lambda = lambdas ) %>% 
+  select(lambda, everything(), -`(Intercept)`) %>% 
+  pivot_longer(cols = -lambda, 
+               names_to = "term", 
+               values_to = "coef") %>%
+  mutate(var = map_chr(stringr::str_split(term,"_"),~.[1]))
+
+coefs_lambdas %>%
+  ggplot(aes(x = lambda, y = coef, group = term, color = var)) +
+  geom_line() +
+  theme_classic() + 
+  theme(legend.position = "bottom", legend.text=element_text(size=8))
 ```
 
 c.
@@ -91,7 +117,7 @@ collect_metrics(lm_result_5)
 #  for LASSO
 penalty_grid <- grid_regular(
   penalty(range = c(-3, 3)),
-  levels = 10) #????
+  levels = 20)
 
 tune_res <- tune_grid(
   lm_lasso_wf, 
@@ -112,7 +138,7 @@ tidy(final_fit)
 
 tune_res %>% collect_metrics(summarize = TRUE) %>% 
   filter(.metric == "rmse") %>% 
-  summarize(mean = mean(mean)) # Get p.value for LASSO model ????
+  summarize(mean = mean(mean))
 ```
 
 d.
@@ -142,8 +168,10 @@ ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
     theme_classic()
 ```
 
-e.
+e. The ticket class is obviously the most important variable, for the reason that for both OLS and LASSO, it has the smallest p-value and is the last variable come to zero when penalty increases. The outcome is similar to what we expect and the reality suggests, as people with higher ticket class definitely pays more for the ticket price.
 
-2. We would go with the orinary least square model, as it has lower RMSE than the LASSO model. The predict accuracies of two models seem not to be reliable as the RMSE values for both models are quite high, considering the scale of the response variable.
+2. 
+We would go with the orinary least square model, as it has lower RMSE than the LASSO model. The predict accuracies of two models seem not to be reliable as the RMSE values for both models are quite high, considering the scale of the response variable.
 
-3.They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
+3.
+They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
