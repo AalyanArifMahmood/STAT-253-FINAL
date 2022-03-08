@@ -7,7 +7,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-a & b.
+### 1. Initial investigation: ignoring nonlinearity
+
+#### a & b.
 
 ```{r}
 # library statements 
@@ -99,7 +101,7 @@ coefs_lambdas %>%
   theme(legend.position = "bottom", legend.text=element_text(size=8))
 ```
 
-c.
+#### c.
 
 ```{r}
 #  calculate/collect CV metrics
@@ -138,7 +140,7 @@ tune_res %>% collect_metrics(summarize = TRUE) %>%
   summarize(mean = mean(mean))
 ```
 
-d.
+#### d.
 
 ```{r}
 #  visual residuals
@@ -165,10 +167,36 @@ ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
     theme_classic()
 ```
 
-e. The ticket class is obviously the most important variable, for the reason that for both OLS and LASSO, it has the smallest p-value and is the last variable come to zero when penalty increases. The outcome is similar to what we expect and the reality suggests, as people with higher ticket class definitely pays more for the ticket price.
+#### e. 
+The ticket class is obviously the most important variable, for the reason that for both OLS and LASSO, it has the smallest p-value and is the last variable come to zero when penalty increases. The outcome is similar to what we expect and the reality suggests, as people with higher ticket class definitely pays more for the ticket price.
 
-2. 
+### 2. Accounting for nonlinearity
+
+```{r}
+lm_spec <-
+  linear_reg() %>%
+  set_engine(engine = 'lm') %>%
+  set_mode('regression')
+
+spline_rec <- data_rec %>%
+    step_ns(Pclass, deg_free = 3) 
+
+spline_wf <- workflow() %>%
+    add_model(lm_spec) %>%
+    add_recipe(spline_rec)
+
+spline_fit <- spline_wf %>% 
+  fit(data = Titanic_clean)
+
+# fit_resamples(
+#     spline_wf,
+#     resamples = Titanic_clean_5,
+#     metrics = metric_set(mae,rmse,rsq)                     
+# ) %>% collect_metrics()
+```
+
+### 3. Summarize investigations 
 We would go with the orinary least square model, as it has lower RMSE than the LASSO model. The predict accuracies of two models seem not to be reliable as the RMSE values for both models are quite high, considering the scale of the response variable.
 
-3.
+### 4. Societal impact
 They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
