@@ -17,6 +17,7 @@ library(readr)
 library(ggplot2)
 library(dplyr)
 library(tidymodels)
+library(TTR)
 tidymodels_prefer()
 
 set.seed(123)
@@ -57,6 +58,12 @@ Stock_clean <- Stock_clean %>%
 ```
 
 ```{r}
+Stock_clean <- Stock_clean %>% 
+  mutate(rsi = RSI(Close, n=14)) %>% 
+  na.omit()
+```
+
+```{r}
 # creation of cv folds
 Stock_clean_5 <- vfold_cv(Stock_clean, v = 5)
 ```
@@ -77,11 +84,10 @@ lm_lasso_spec <-
 
 ```{r}
 # recipes
-data_rec <- recipe(Close ~ Date + Open + High + Low, data = Stock_clean) %>%
+data_rec <- recipe(Close ~ Date + Open + High + Low + rsi, data = Stock_clean) %>%
   step_nzv(all_predictors()) %>%
-  step_normalize(all_numeric_predictors()) %>%
-  step_dummy(all_nominal_predictors()) %>% 
-  step_corr(all_numeric_predictors())
+  step_normalize(all_numeric_predictors())
+  #step_corr(all_numeric_predictors())
 
 # workflows
 lm_wf <- workflow() %>%
@@ -121,4 +127,41 @@ coefs_lambdas %>%
   geom_line() +
   theme_classic() + 
   theme(legend.position = "bottom", legend.text=element_text(size=8))
+```
+
+```{r}
+#  calculate/collect CV metrics
+#  For linear regression
+lm_result_5 <- fit_resamples(lm_wf,
+                             resamples = Stock_clean_5, 
+                             metrics = metric_set(rmse, rsq, mae))
+
+collect_metrics(lm_result_5)
+
+
+#  for LASSO
+penalty_grid <- grid_regular(
+  penalty(range = c(-3, 3)),
+  levels = 20)
+
+tune_res <- tune_grid(
+  lm_lasso_wf, 
+  resamples = Stock_clean_5,
+  metrics = metric_set(rmse, mae),
+  grid = penalty_grid 
+)
+
+autoplot(tune_res) + theme_classic()
+
+best_penalty <- select_best(tune_res, metric = 'rmse')
+
+final_wf <- finalize_workflow(lm_lasso_wf, best_penalty)
+
+final_fit <- fit(final_wf, data = Stock_clean)
+
+tidy(final_fit)
+
+tune_res %>% collect_metrics(summarize = TRUE) %>% 
+  filter(.metric == "rmse") %>% 
+  summarize(mean = mean(mean))
 ```
