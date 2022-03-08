@@ -19,9 +19,7 @@ library(dplyr)
 library(tidymodels)
 library(TTR)
 tidymodels_prefer()
-
 set.seed(123)
-
 # read in data
 Stock <- read_csv("indexData.csv")
 ```
@@ -35,24 +33,20 @@ Stock_clean <- Stock %>%
          High != "null",
          Low != "null",
          Close != "null")
-
 Stock_clean %>% 
   group_by(Index) %>% 
   summarize(n = n()) %>% 
   arrange(desc(n))
-
 Stock_clean <- Stock_clean %>% 
   filter(Index == "NYA") %>% 
   mutate(Open = as.numeric(Open),
          High = as.numeric(High),
          Low = as.numeric(Low),
          Close = as.numeric(Close))
-
 Stock_clean %>% 
   ggplot() +
   geom_line(aes(x = Date,
                 y = Open))
-
 Stock_clean <- Stock_clean %>% 
   mutate(Date = as.numeric(Date))
 ```
@@ -74,7 +68,6 @@ lm_spec <-
     linear_reg() %>%
     set_engine(engine = "lm") %>% 
     set_mode("regression")
-
 lm_lasso_spec <- 
   linear_reg() %>%
   set_args(mixture = 1, penalty = tune()) %>%
@@ -88,12 +81,10 @@ data_rec <- recipe(Close ~ Date + Open + High + Low + rsi, data = Stock_clean) %
   step_nzv(all_predictors()) %>%
   step_normalize(all_numeric_predictors())
   #step_corr(all_numeric_predictors())
-
 # workflows
 lm_wf <- workflow() %>%
   add_recipe(data_rec) %>%
   add_model(lm_spec) 
-
 lm_lasso_wf <- workflow() %>% 
   add_recipe(data_rec) %>%
   add_model(lm_lasso_spec)
@@ -103,12 +94,9 @@ lm_lasso_wf <- workflow() %>%
 # fit & tune models
 fit_lm_model <- fit(lm_wf, Stock_clean)
 tidy(fit_lm_model)
-
 lm_lasso_fit <- lm_lasso_wf %>% 
   fit(data = Stock_clean)
-
 glmnet_output <- lm_lasso_fit %>% extract_fit_parsnip() %>% pluck('fit') 
-
 lambdas <- glmnet_output$lambda
 coefs_lambdas <- 
   coefficients(glmnet_output, s = lambdas )  %>% 
@@ -121,7 +109,6 @@ coefs_lambdas <-
                names_to = "term", 
                values_to = "coef") %>%
   mutate(var = map_chr(stringr::str_split(term,"_"),~.[1]))
-
 coefs_lambdas %>%
   ggplot(aes(x = lambda, y = coef, group = term, color = var)) +
   geom_line() +
@@ -135,32 +122,22 @@ coefs_lambdas %>%
 lm_result_5 <- fit_resamples(lm_wf,
                              resamples = Stock_clean_5, 
                              metrics = metric_set(rmse, rsq, mae))
-
 collect_metrics(lm_result_5)
-
-
 #  for LASSO
 penalty_grid <- grid_regular(
   penalty(range = c(-3, 3)),
   levels = 20)
-
 tune_res <- tune_grid(
   lm_lasso_wf, 
   resamples = Stock_clean_5,
   metrics = metric_set(rmse, mae),
   grid = penalty_grid 
 )
-
 autoplot(tune_res) + theme_classic()
-
 best_penalty <- select_best(tune_res, metric = 'rmse')
-
 final_wf <- finalize_workflow(lm_lasso_wf, best_penalty)
-
 final_fit <- fit(final_wf, data = Stock_clean)
-
 tidy(final_fit)
-
 tune_res %>% collect_metrics(summarize = TRUE) %>% 
   filter(.metric == "rmse") %>% 
   summarize(mean = mean(mean))

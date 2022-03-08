@@ -177,9 +177,15 @@ lm_spec <-
   linear_reg() %>%
   set_engine(engine = 'lm') %>%
   set_mode('regression')
+data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_corr(all_numeric_predictors())
 
 spline_rec <- data_rec %>%
-    step_ns(Pclass, deg_free = 3) 
+  step_naomit(all_numeric_predictors(), skip = FALSE) %>%
+  step_ns(Pclass, deg_free = 3) 
 
 spline_wf <- workflow() %>%
     add_model(lm_spec) %>%
