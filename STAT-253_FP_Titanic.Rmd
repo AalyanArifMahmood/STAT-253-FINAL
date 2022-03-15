@@ -177,7 +177,7 @@ lm_spec <-
   linear_reg() %>%
   set_engine(engine = 'lm') %>%
   set_mode('regression')
-data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
+data_rec <- recipe(Fare ~ Survived + Pclass + Sex + Age + SibSp + Parch + Embarked, data = Titanic_clean) %>%
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
@@ -185,7 +185,7 @@ data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
 
 spline_rec <- data_rec %>%
   step_naomit(all_numeric_predictors(), skip = FALSE) %>%
-  step_ns(Pclass, deg_free = 3) 
+  step_ns(Age, deg_free = 5)
 
 spline_wf <- workflow() %>%
     add_model(lm_spec) %>%
@@ -199,6 +199,33 @@ spline_fit <- spline_wf %>%
 #     resamples = Titanic_clean_5,
 #     metrics = metric_set(mae,rmse,rsq)                     
 # ) %>% collect_metrics()
+tidy(spline_fit)
+```
+```{r}
+spline_mod_output <- Titanic_clean %>%
+  bind_cols(predict(spline_fit, new_data = Titanic_clean)) %>%
+    mutate(resid = Fare - .pred)
+
+# Residual plots
+ggplot(spline_mod_output, aes(x = Age, y = resid)) +
+    geom_point() +
+    geom_smooth() +
+    geom_hline(yintercept = 0, color = "red") +
+    theme_classic()
+
+ggplot(spline_mod_output, aes(x = Parch, y = resid)) +
+    geom_point() +
+    geom_smooth() +
+    geom_hline(yintercept = 0, color = "red") +
+    theme_classic()
+
+ggplot(spline_mod_output, aes(x = .pred, y = resid)) +
+    geom_point() +
+    geom_smooth() +
+    geom_hline(yintercept = 0, color = "red") +
+    theme_classic()
+
+
 ```
 
 ### 3. Summarize investigations 
