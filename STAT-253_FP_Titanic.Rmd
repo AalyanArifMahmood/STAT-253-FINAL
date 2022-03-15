@@ -22,7 +22,7 @@ tidymodels_prefer()
 set.seed(123)
 
 # read in data
-Titanic <- read_csv("train.csv")
+Titanic <- read_csv("Data/train.csv")
 ```
 
 ```{r}

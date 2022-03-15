@@ -21,7 +21,7 @@ library(TTR)
 tidymodels_prefer()
 set.seed(123)
 # read in data
-Stock <- read_csv("indexData.csv")
+Stock <- read_csv("Data/indexData.csv")
 ```
 
 ```{r}
