@@ -279,7 +279,6 @@ gam_result_5 %>% collect_metrics()
 
 #### Evaluation (GAMs)
 
-
 From the GAM model result, considering the p-values for predictors, we can see that the important variables are Pclass, Parch, EmbarkedS, and SibSp, which correspond to those of LASSO and OLS models from the Investigation 1. However, the most relevant predictor does not change when accounting for nonlinearity, as it is a categorical variable.
 
 From the GAM output plots for each predictor, we can see that Age does a great job as the blue and red lines overlap. However, Age is not an important variable in the model. Thus, the expected model performance between the GAM model and linear models would not change a lot.
