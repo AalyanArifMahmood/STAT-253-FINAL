@@ -7,8 +7,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### 1. Initial investigation: ignoring nonlinearity
-
 ```{r}
 # library statements 
 library(readr)
@@ -42,6 +40,7 @@ data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
   step_corr(all_numeric_predictors())
 ```
 
+### 1. Initial investigation: ignoring nonlinearity
 #### For OLS
 
 ```{r}
