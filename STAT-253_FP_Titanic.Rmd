@@ -9,8 +9,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### 1. Initial investigation: ignoring nonlinearity
 
-#### a & b.
-
 ```{r}
 # library statements 
 library(readr)
@@ -32,151 +30,285 @@ Titanic_clean <- Titanic %>%
     na.omit()
 
 Titanic_clean
-```
 
-```{r}
 # creation of cv folds
 Titanic_clean_5 <- vfold_cv(Titanic_clean, v = 5)
-```
 
-```{r}
-# model spec
-lm_spec <-
-    linear_reg() %>%
-    set_engine(engine = "lm") %>% 
-    set_mode("regression")
-
-lm_lasso_spec <- 
-  linear_reg() %>%
-  set_args(mixture = 1, penalty = tune()) %>%
-  set_engine(engine = 'glmnet') %>%
-  set_mode('regression') 
-```
-
-```{r}
 # recipes
 data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_corr(all_numeric_predictors())
+```
 
-# workflows
+#### For OLS
+
+```{r}
+# model spec for OLS
+lm_spec <-
+  linear_reg() %>%
+  set_engine(engine = "lm") %>%
+  set_mode("regression")
+
+# workflow for OLS
 lm_wf <- workflow() %>%
   add_recipe(data_rec) %>%
   add_model(lm_spec) 
+```
 
-lm_lasso_wf <- workflow() %>% 
+```{r}
+# Fit the OLS model
+fit_lm_model <- fit(lm_wf, Titanic_clean)
+```
+
+```{r}
+# Present the OLS model result and its metrics
+tidy(fit_lm_model)
+glance(fit_lm_model)
+```
+
+```{r}
+#  Calculate and collect CV metrics for OLS
+lm_result_5 <- fit_resamples(lm_wf,
+                             resamples = Titanic_clean_5,
+                             metrics = metric_set(rmse, rsq, mae))
+
+collect_metrics(lm_result_5)
+```
+
+```{r}
+# Visualize the residual plot for OLS
+lm_model_output <- fit_lm_model %>%
+  predict(new_data = Titanic_clean) %>%
+  bind_cols(Titanic_clean) %>%
+  mutate(resid = Fare - .pred)
+
+ggplot(lm_model_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+#### For LASSO
+
+```{r}
+# model spec for LASSO
+lm_lasso_spec <-
+  linear_reg() %>%
+  set_args(mixture = 1, penalty = tune()) %>%
+  set_engine(engine = 'glmnet') %>%
+  set_mode('regression') 
+
+# workflows for LASSO
+lm_lasso_wf <- workflow() %>%
   add_recipe(data_rec) %>%
   add_model(lm_lasso_spec)
 ```
 
 ```{r}
-# fit & tune models
-fit_lm_model <- fit(lm_wf, Titanic_clean)
-tidy(fit_lm_model)
-
-lm_lasso_fit <- lm_lasso_wf %>% 
+# Fit the LASSO model
+lm_lasso_fit <- lm_lasso_wf %>%
   fit(data = Titanic_clean)
-
-glmnet_output <- lm_lasso_fit %>% extract_fit_parsnip() %>% pluck('fit') # way to get the original glmnet output
-
-lambdas <- glmnet_output$lambda
-coefs_lambdas <- 
-  coefficients(glmnet_output, s = lambdas )  %>% 
-  as.matrix() %>%  
-  t() %>% 
-  as.data.frame() %>% 
-  mutate(lambda = lambdas ) %>% 
-  select(lambda, everything(), -`(Intercept)`) %>% 
-  pivot_longer(cols = -lambda, 
-               names_to = "term", 
-               values_to = "coef") %>%
-  mutate(var = map_chr(stringr::str_split(term,"_"),~.[1]))
-
-coefs_lambdas %>%
-  ggplot(aes(x = lambda, y = coef, group = term, color = var)) +
-  geom_line() +
-  theme_classic() + 
-  theme(legend.position = "bottom", legend.text=element_text(size=8))
 ```
 
-#### c.
+```{r}
+# Tune the LASSO model
+glmnet_output <-
+  lm_lasso_fit %>% extract_fit_parsnip() %>% pluck('fit')
+
+lambdas <- glmnet_output$lambda
+coefs_lambdas <-
+  coefficients(glmnet_output, s = lambdas)  %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(lambda = lambdas) %>%
+  select(lambda, everything(),-`(Intercept)`) %>%
+  pivot_longer(cols = -lambda,
+               names_to = "term",
+               values_to = "coef") %>%
+  mutate(var = map_chr(stringr::str_split(term, "_"),  ~ .[1]))
+
+coefs_lambdas %>%
+  ggplot(aes(
+    x = lambda,
+    y = coef,
+    group = term,
+    color = var
+  )) +
+  geom_line() +
+  theme_classic() +
+  theme(legend.position = "bottom", legend.text = element_text(size = 8))
+```
 
 ```{r}
-#  calculate/collect CV metrics
-#  For linear regression
-lm_result_5 <- fit_resamples(lm_wf,
-                             resamples = Titanic_clean_5, 
-                             metrics = metric_set(rmse, rsq, mae))
-
-collect_metrics(lm_result_5)
-
-
-#  for LASSO
-penalty_grid <- grid_regular(
-  penalty(range = c(-3, 3)),
-  levels = 20)
+# Visualize the best penalty term
+penalty_grid <- grid_regular(penalty(range = c(-3, 3)),
+                             levels = 20)
 
 tune_res <- tune_grid(
-  lm_lasso_wf, 
+  lm_lasso_wf,
   resamples = Titanic_clean_5,
-  metrics = metric_set(rmse, mae),
-  grid = penalty_grid 
+  metrics = metric_set(rmse, mae, rsq),
+  grid = penalty_grid
 )
 
 autoplot(tune_res) + theme_classic()
-
-best_penalty <- select_best(tune_res, metric = 'rmse')
-
-final_wf <- finalize_workflow(lm_lasso_wf, best_penalty)
-
-final_fit <- fit(final_wf, data = Titanic_clean)
-
-tidy(final_fit)
-
-tune_res %>% collect_metrics(summarize = TRUE) %>% 
-  filter(.metric == "rmse") %>% 
-  summarize(mean = mean(mean))
 ```
-
-#### d.
 
 ```{r}
-#  visual residuals
-lm_model_output <- fit_lm_model %>% 
-    predict(new_data = Titanic_clean) %>%
-    bind_cols(Titanic_clean) %>%
-    mutate(resid = Fare - .pred)
-
-ggplot(lm_model_output, aes(x = .pred, y = resid)) +
-    geom_point() +
-    geom_smooth() +
-    geom_hline(yintercept = 0, color = "red") +
-    theme_classic()
-
-lasso_model_output <- final_fit %>% 
-    predict(new_data = Titanic_clean) %>%
-    bind_cols(Titanic_clean) %>%
-    mutate(resid = Fare - .pred)
-
-ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
-    geom_point() +
-    geom_smooth() +
-    geom_hline(yintercept = 0, color = "red") +
-    theme_classic()
+# Present the LASSO model result
+best_penalty <- select_best(tune_res, metric = 'rmse')
+final_wf <- finalize_workflow(lm_lasso_wf, best_penalty)
+final_fit <- fit(final_wf, data = Titanic_clean)
+tidy(final_fit)
 ```
 
-#### e. 
+```{r}
+#  Calculate and collect CV metrics for LASSO
+lasso_result_5 <- tune_res %>% collect_metrics(summarize = TRUE) %>%
+  na.omit() %>% 
+  group_by(.metric) %>% 
+  summarize(mean = mean(mean))
+lasso_result_5
+```
+
+```{r}
+# Visualize the residual plot for LASSO
+lasso_model_output <- final_fit %>%
+  predict(new_data = Titanic_clean) %>%
+  bind_cols(Titanic_clean) %>%
+  mutate(resid = Fare - .pred)
+
+ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+#### Evaluation (OLS and LASSO)
+
+```{r}
+# CV metrics for OLS
+lm_result_5 %>% 
+  collect_metrics()
+
+# CV metrics for LASSO
+lasso_result_5
+```
+
 The ticket class is obviously the most important variable, for the reason that for both OLS and LASSO, it has the smallest p-value and is the last variable come to zero when penalty increases. The outcome is similar to what we expect and the reality suggests, as people with higher ticket class definitely pays more for the ticket price.
+
+By comparing the CV results for two models, we can see that the OLS model has lower MAE and RMSE and higher $R^2$ than the LASSO model, which indicates that we prefer OLS over LASSO to predict Fare for this dataset.
 
 ### 2. Accounting for nonlinearity
 
+#### GAMs 
+
 ```{r}
+# GAM model using mgcv
+gam_spec <-
+  gen_additive_mod() %>%
+  set_engine(engine = 'mgcv') %>%
+  set_mode('regression')
+
+gam_mod <- fit(gam_spec,
+               Fare ~ Survived + Pclass + SibSp + Parch + Sex + Embarked + s(Age),
+               data = Titanic_clean)
+```
+
+```{r}
+# Present the GAM model result
+gam_mod %>% pluck('fit') %>% summary() 
+```
+
+```{r}
+# Visualize the evaluation plots for GAMs
+par(mfrow = c(2, 3))
+gam_mod %>% pluck('fit') %>% mgcv::gam.check()
+gam_mod %>% pluck('fit') %>% plot()
+```
+
+```{r}
+# Visualize the residual plot for GAMs
+gam_mod_output <- Titanic_clean %>%
+  bind_cols(predict(gam_mod, new_data = Titanic_clean)) %>%
+  mutate(resid = Fare - .pred)
+
+ggplot(gam_mod_output, aes(x = Age, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_mod_output, aes(x = Parch, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_mod_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+```{r}
+#  Calculate and collect CV metrics for GAMs
+spline_lm_spec <-
+  linear_reg() %>%
+  set_engine(engine = 'lm') %>%
+  set_mode('regression')
+
+spline_rec <- data_rec %>%
+  step_naomit(all_numeric_predictors(), skip = FALSE) %>%
+  step_ns(Age, deg_free = 2.694)
+
+spline_wf <- workflow() %>%
+  add_model(spline_lm_spec) %>%
+  add_recipe(spline_rec)
+
+gam_result_5 <- fit_resamples(spline_wf,
+              resamples = Titanic_clean_5,
+              metrics = metric_set(mae, rmse, rsq))
+
+gam_result_5 %>% collect_metrics()
+```
+
+#### Evaluation (GAMs)
+
+
+From the GAM model result, considering the p-values for predictors, we can see that the important variables are Pclass, Parch, EmbarkedS, and SibSp, which correspond to those of LASSO and OLS models from the Investigation 1. However, the most relevant predictor does not change when accounting for nonlinearity, as it is a categorical variable.
+
+From the GAM output plots for each predictor, we can see that Age does a great job as the blue and red lines overlap. However, Age is not an important variable in the model. Thus, the expected model performance between the GAM model and linear models would not change a lot.
+
+```{r}
+# CV metrics for OLS
+lm_result_5 %>%
+  collect_metrics()
+
+# CV metrics for LASSO
+lasso_result_5
+
+# CV metrics for GAMs
+gam_result_5 %>% 
+  collect_metrics()
+```
+
+The MAE and RMSE values for the GAM model are lower than those of the OLS model and LASSO model, and the $R^2$ value for the GAM model is 0.4317564, which is slightly greater. This is reasonable as we make Age non-linear, but it is not an important predictor to the model and it would not largely affect the model result.
+
+
+
+```{r}
+# GAMs model using lm
 lm_spec <-
   linear_reg() %>%
   set_engine(engine = 'lm') %>%
   set_mode('regression')
+
 data_rec <- recipe(Fare ~ Survived + Pclass + Sex + Age + SibSp + Parch + Embarked, data = Titanic_clean) %>%
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric_predictors()) %>% 
@@ -185,7 +317,7 @@ data_rec <- recipe(Fare ~ Survived + Pclass + Sex + Age + SibSp + Parch + Embark
 
 spline_rec <- data_rec %>%
   step_naomit(all_numeric_predictors(), skip = FALSE) %>%
-  step_ns(Age, deg_free = 5)
+  step_ns(Age, deg_free = 2.694)
 
 spline_wf <- workflow() %>%
     add_model(lm_spec) %>%
@@ -194,13 +326,16 @@ spline_wf <- workflow() %>%
 spline_fit <- spline_wf %>% 
   fit(data = Titanic_clean)
 
-# fit_resamples(
-#     spline_wf,
-#     resamples = Titanic_clean_5,
-#     metrics = metric_set(mae,rmse,rsq)                     
-# ) %>% collect_metrics()
 tidy(spline_fit)
+
+glance(spline_fit)
 ```
+```{r}
+par(mfrow = c(2, 3))
+spline_fit %>% pluck('fit') %>% mgcv::gam.check()
+spline_fit %>% pluck('fit') %>% plot()
+```
+
 ```{r}
 spline_mod_output <- Titanic_clean %>%
   bind_cols(predict(spline_fit, new_data = Titanic_clean)) %>%
@@ -224,12 +359,10 @@ ggplot(spline_mod_output, aes(x = .pred, y = resid)) +
     geom_smooth() +
     geom_hline(yintercept = 0, color = "red") +
     theme_classic()
-
-
 ```
 
 ### 3. Summarize investigations 
-We would go with the orinary least square model, as it has lower RMSE than the LASSO model. The predict accuracies of two models seem not to be reliable as the RMSE values for both models are quite high, considering the scale of the response variable.
+We would go with the GAMs model, as it has lower RMSE and MAE and higher $R^2$. THe inerpretability of three models are all good. However, the predict accuracies of three models seem not to be reliable as the RMSE values for all models are quite high, considering the scale of the response variable.
 
 ### 4. Societal impact
 They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
