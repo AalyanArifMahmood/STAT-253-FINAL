@@ -299,66 +299,6 @@ gam_result_5 %>%
 The MAE and RMSE values for the GAM model are lower than those of the OLS model and LASSO model, and the $R^2$ value for the GAM model is 0.4317564, which is slightly greater. This is reasonable as we make Age non-linear, but it is not an important predictor to the model and it would not largely affect the model result.
 
 
-
-```{r}
-# GAMs model using lm
-lm_spec <-
-  linear_reg() %>%
-  set_engine(engine = 'lm') %>%
-  set_mode('regression')
-
-data_rec <- recipe(Fare ~ Survived + Pclass + Sex + Age + SibSp + Parch + Embarked, data = Titanic_clean) %>%
-  step_nzv(all_predictors()) %>% 
-  step_normalize(all_numeric_predictors()) %>% 
-  step_dummy(all_nominal_predictors()) %>% 
-  step_corr(all_numeric_predictors())
-
-spline_rec <- data_rec %>%
-  step_naomit(all_numeric_predictors(), skip = FALSE) %>%
-  step_ns(Age, deg_free = 2.694)
-
-spline_wf <- workflow() %>%
-    add_model(lm_spec) %>%
-    add_recipe(spline_rec)
-
-spline_fit <- spline_wf %>% 
-  fit(data = Titanic_clean)
-
-tidy(spline_fit)
-
-glance(spline_fit)
-```
-```{r}
-par(mfrow = c(2, 3))
-spline_fit %>% pluck('fit') %>% mgcv::gam.check()
-spline_fit %>% pluck('fit') %>% plot()
-```
-
-```{r}
-spline_mod_output <- Titanic_clean %>%
-  bind_cols(predict(spline_fit, new_data = Titanic_clean)) %>%
-    mutate(resid = Fare - .pred)
-
-# Residual plots
-ggplot(spline_mod_output, aes(x = Age, y = resid)) +
-    geom_point() +
-    geom_smooth() +
-    geom_hline(yintercept = 0, color = "red") +
-    theme_classic()
-
-ggplot(spline_mod_output, aes(x = Parch, y = resid)) +
-    geom_point() +
-    geom_smooth() +
-    geom_hline(yintercept = 0, color = "red") +
-    theme_classic()
-
-ggplot(spline_mod_output, aes(x = .pred, y = resid)) +
-    geom_point() +
-    geom_smooth() +
-    geom_hline(yintercept = 0, color = "red") +
-    theme_classic()
-```
-
 ### 3. Summarize investigations 
 We would go with the GAMs model, as it has lower RMSE and MAE and higher $R^2$. THe inerpretability of three models are all good. However, the predict accuracies of three models seem not to be reliable as the RMSE values for all models are quite high, considering the scale of the response variable.
 
