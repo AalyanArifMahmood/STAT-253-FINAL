@@ -14,6 +14,8 @@ library(ggplot2)
 library(dplyr)
 library(tidymodels)
 tidymodels_prefer()
+library(vip)
+library(ranger)
 
 set.seed(123)
 
@@ -39,6 +41,89 @@ data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
   step_dummy(all_nominal_predictors()) %>% 
   step_corr(all_numeric_predictors())
 ```
+
+## Classification (RANDOM FOREST)
+
+```{r}
+set.seed(123)
+# Model Specification
+rf_spec <- rand_forest() %>%
+  set_engine(engine = 'ranger') %>% 
+  set_args(mtry = NULL, # size of random subset of variables; default is floor(sqrt(number of total predictors))
+           trees = 100, # Number of trees
+           min_n = 2,
+           probability = FALSE, # FALSE: get hard predictions (not needed for regression)
+           importance = 'impurity') %>% # we'll come back to this at the end
+  set_mode('classification') # change this for regression
+```
+
+```{r}
+Titanic_clean <-Titanic_clean %>%
+  mutate(Survived = as.factor(Survived))
+```
+
+
+```{r}
+titanic_rec <- recipe(Survived ~ ., data = Titanic_clean)
+
+# Workflows
+titanic_wf_2 <- workflow() %>%
+  add_model(rf_spec %>% set_args(mtry = 2)) %>%
+  add_recipe(titanic_rec)
+```
+
+
+```{r}
+set.seed(123) # make sure to run this before each fit so that you have the same 1000 trees
+Titanic_fit <- fit(titanic_wf_2, data = Titanic_clean)
+```
+
+```{r}
+rf_OOB_output <- function(fit_model, truth){
+    tibble(
+          .pred_class = fit_model %>% extract_fit_engine() %>% pluck('predictions'), #OOB predictions
+          class = truth
+      )
+}
+
+#check out the function output
+rf_output <- rf_OOB_output(Titanic_fit, Titanic_clean %>% pull(Survived))
+```
+
+```{r}
+data_rf_OOB_output <-  rf_output %>% 
+    accuracy(truth = class, estimate = .pred_class)
+```
+
+
+```{r}
+titanic_output2 <- titanic_wf_2 %>% 
+  update_model(rf_spec %>% set_args(importance = "permutation")) %>% #based on permutation
+  fit(data = Titanic_clean) %>% 
+    extract_fit_engine() 
+
+titanic_output2 %>% 
+    vip(num_features = 30) + theme_classic()
+
+
+titanic_output2 %>% vip::vi() %>% head()
+titanic_output2 %>% vip::vi() %>% tail()
+```
+
+```{r}
+rf_OOB_output(Titanic_fit, Titanic_clean %>% pull(Survived)) %>%
+    conf_mat(truth = class, estimate= .pred_class)
+```
+
+## DECISION TREE
+
+```{r}
+
+```
+
+
+
+
 
 ### 1. Initial investigation: ignoring nonlinearity
 #### For OLS
