@@ -389,3 +389,63 @@ We would go with the GAMs model, as it has lower RMSE and MAE and higher $R^2$. 
 
 ### 4. Societal impact
 They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
+
+```{r}
+# RF from the internet
+library(ggplot2)
+library(randomForest)
+library(tidyverse)
+
+set.seed(1)
+train <- read.csv("data/train.csv", stringsAsFactors=FALSE)
+test  <- read.csv("data/test.csv",  stringsAsFactors=FALSE)
+
+extractFeatures <- function(data) {
+  features <- c("Pclass",
+                "Age",
+                "Sex",
+                "Parch",
+                "SibSp",
+                "Fare",
+                "Embarked")
+  fea <- data[,features]
+  fea$Age[is.na(fea$Age)] <- -1
+  fea$Fare[is.na(fea$Fare)] <- median(fea$Fare, na.rm=TRUE)
+  fea$Embarked[fea$Embarked==""] = "S"
+  fea$Sex      <- as.factor(fea$Sex)
+  fea$Embarked <- as.factor(fea$Embarked)
+  return(fea)
+}
+
+rf <- randomForest(extractFeatures(train), as.factor(train$Survived), ntree=100, importance=TRUE)
+
+submission <- data.frame(PassengerId = test$PassengerId)
+submission$Survived <- predict(rf, extractFeatures(test))
+
+train <- train %>% 
+  mutate(pred = predict(rf, extractFeatures(train))) %>% 
+  select(pred, Survived)
+
+imp <- importance(rf, type=1)
+featureImportance <- data.frame(Feature=row.names(imp), Importance=imp[,1])
+
+p <- ggplot(featureImportance, aes(x=reorder(Feature, Importance), y=Importance)) +
+     geom_bar(stat="identity", fill="#53cfff") +
+     coord_flip() + 
+     theme_light(base_size=20) +
+     xlab("") +
+     ylab("Importance") + 
+     ggtitle("Random Forest Feature Importance\n") +
+     theme(plot.title=element_text(size=18))
+
+p
+
+submission
+
+train %>% 
+  mutate(correct = ifelse(pred == Survived, "correct", "incorrect")) %>% 
+  group_by(correct) %>% 
+  summarize(sum = n())
+
+rf
+```
