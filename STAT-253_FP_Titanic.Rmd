@@ -16,6 +16,9 @@ library(tidymodels)
 library(vip)
 library(ranger)
 library(broom)
+library(e1071)
+library(caTools)
+library(class)
 
 tidymodels_prefer()
 theme_set(theme_bw())
@@ -131,7 +134,7 @@ knn_spec <-
   nearest_neighbor() %>%
   set_args(neighbors = tune()) %>% 
   set_engine(engine = 'kknn') %>%
-  set_mode('regression') 
+  set_mode('classification') 
 
 # Recipe
 data_rec2 <- recipe(Survived ~ ., data = Titanic_clean) %>%
@@ -154,30 +157,11 @@ penalty_grid <- grid_regular(
   levels = 20)
 
 knn_fit_cv <- tune_grid(knn_wf,
-              resamples = Titanic_clean_52,
-              grid = penalty_grid,
-              metrics = metric_set(rmse, mae, rsq))
+                        resamples = Titanic_clean_52,
+                        grid = penalty_grid)
 
 knn_fit_cv %>% 
-  collect_metrics() %>% 
-  ggplot() +
-  geom_line(aes(x = neighbors,
-                y = mean,
-                group = .metric,
-                color = .metric))
-
-best_neighbors <- knn_fit_cv %>% 
-  collect_metrics() %>% 
-  filter(.metric == "mae") %>% 
-  filter(mean == min(mean)) %>% 
-  select(neighbors) %>% 
-  pull()
-
-knn_result_5 <- knn_fit_cv %>% 
-  collect_metrics() %>% 
-  filter(neighbors == best_neighbors)
-
-knn_result_5
+  collect_metrics()
 ```
 
 
