@@ -6,7 +6,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE,
+                      eval = TRUE)
 ```
 
 ```{r}
@@ -38,7 +41,7 @@ Titanic_clean <- Titanic %>%
 Titanic_clean
 ```
 
-# Classification
+## Classification
 
 ```{r}
 # Process the data and make the recipe for classification
@@ -65,7 +68,7 @@ helper_confusion <- function(x) {
 }
 ```
 
-## Random Forest
+### Random Forest
 
 ```{r}
 rf_spec <- rand_forest() %>%
@@ -126,7 +129,7 @@ rf_confusion
 helper_confusion(rf_confusion)
 ```
 
-## Decision Tree
+### Decision Tree
 
 ```{r}
 dt_spec <- decision_tree() %>%
@@ -164,7 +167,7 @@ dt_confusion
 helper_confusion(dt_confusion)
 ```
 
-## KNN
+### KNN
 
 ```{r}
 knn_spec <- 
@@ -223,7 +226,7 @@ knn_confusion <- knn_output %>%
 helper_confusion(knn_confusion)
 ```
 
-## Evaluation (RF, DT, KNN)
+### Evaluation (RF, DT, KNN)
 
 ```{r}
 cbind(RF = helper_confusion(rf_confusion)) %>% 
@@ -232,7 +235,7 @@ cbind(RF = helper_confusion(rf_confusion)) %>%
 ```
 
 
-# Regression
+## Regression
 
 ```{r}
 # Process the data and make the recipe for regression
@@ -247,7 +250,7 @@ rec_r <- recipe(Fare ~ ., data = titanic_r) %>%
 titanic_r_cv5 <- vfold_cv(titanic_r, v = 5)
 ```
 
-## OLS
+### OLS
 
 ```{r}
 # model spec for OLS
@@ -296,7 +299,7 @@ ggplot(lm_output2, aes(x = .pred, y = resid)) +
   theme_classic()
 ```
 
-## LASSO
+### LASSO
 
 ```{r}
 # model spec for LASSO
@@ -395,7 +398,7 @@ ggplot(lasso_output2, aes(x = .pred, y = resid)) +
   theme_classic()
 ```
 
-## GAMs
+### GAMs
 
 ```{r}
 # GAM model using mgcv
@@ -423,7 +426,7 @@ gam_mod %>% pluck('fit') %>% plot()
 
 ```{r}
 # Visualize the residual plot for GAMs
-gam_output <- Titanic_clean %>%
+gam_output <- titanic_r %>%
   bind_cols(predict(gam_mod, new_data = titanic_r)) %>%
   mutate(resid = Fare - .pred)
 
@@ -442,7 +445,7 @@ ggplot(gam_output, aes(x = Parch, y = resid)) +
 ggplot(gam_output, aes(x = .pred, y = resid)) +
   geom_point() +
   geom_smooth() +
-  geom_hline(gam_output = 0, color = "red") +
+  geom_hline(yintercept = 0, color = "red") +
   theme_classic()
 ```
 
@@ -468,7 +471,7 @@ gam_output <- fit_resamples(gam_wf,
 gam_output %>% collect_metrics()
 ```
 
-## Evaluation (OLS, LASSO, GAMs)
+### Evaluation (OLS, LASSO, GAMs)
 
 ```{r}
 regreDF <- lm_output %>%
