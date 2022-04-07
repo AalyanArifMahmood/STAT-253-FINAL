@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ```{r}
@@ -18,6 +18,8 @@ library(vip)
 library(ranger)
 library(rpart.plot)
 library(broom)
+library(kknn)
+library(glmnet)
 
 tidymodels_prefer()
 theme_set(theme_bw())
@@ -43,15 +45,23 @@ Titanic_clean
 titanic_c <- Titanic_clean %>%
   mutate(Survived = as.factor(Survived))
 
-rec_c <- recipe(Survived ~ ., data = titanic_c)
+rec_c <- recipe(Survived ~ ., data = titanic_c) %>%
+  step_nzv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_corr(all_numeric_predictors())
+
+titanic_c_cv5 <- vfold_cv(titanic_c, v = 5)
 ```
 
 ```{r}
 # Helper method to calculate Sens, Spec, and Accu
 helper_confusion <- function(x) {
-  return(list("Sensitivty" = x$table[1] / (x$table[1] + x$table[2]),
-              "Specificity" = x$table[4] / (x$table[3] + x$table[4]),
-              "Accuracy" = (x$table[1] + x$table[4]) / (x$table[1] + x$table[2] + x$table[3] + x$table[4])))
+  return(list(
+    "Sensitivty" = x$table[1] / (x$table[1] + x$table[2]),
+    "Specificity" = x$table[4] / (x$table[3] + x$table[4]),
+    "Accuracy" = (x$table[1] + x$table[4]) / (x$table[1] + x$table[2] + x$table[3] + x$table[4])
+  ))
 }
 ```
 
@@ -124,7 +134,101 @@ dt_spec <- decision_tree() %>%
   set_args(cost_complexity = NULL,
            min_n = NULL,
            tree_depth = NULL) %>%
+  set_mode('classification')
+
+dt_wf <- workflow() %>%
+  add_model(dt_spec) %>%
+  add_recipe(rec_c)
+```
+
+```{r}
+dt_fit <- dt_wf %>% fit(data = titanic_c)
+```
+
+```{r}
+dt_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+
+dt_output <- dt_fit %>%
+  predict(new_data = titanic_c) %>%
+  bind_cols(titanic_c)
+
+dt_confusion <- dt_output %>%
+  conf_mat(truth = Survived, estimate = .pred_class)
+
+dt_confusion
+```
+
+```{r}
+helper_confusion(dt_confusion)
+```
+
+## KNN
+
+```{r}
+knn_spec <- 
+  nearest_neighbor() %>%
+  set_args(neighbors = tune()) %>% 
+  set_engine(engine = 'kknn') %>%
   set_mode('classification') 
+
+knn_wf <- workflow() %>%
+  add_model(knn_spec) %>% 
+  add_recipe(rec_c)
+```
+
+```{r}
+penalty_grid <- grid_regular(neighbors(range = c(1, 100)),
+                             levels = 20)
+
+knn_cv <- tune_grid(knn_wf,
+                    resamples = titanic_c_cv5,
+                    grid = penalty_grid)
+
+knn_cv %>%
+  collect_metrics() %>%
+  ggplot(aes(x = neighbors,
+             y = mean,
+             color = .metric)) +
+  geom_line()
+```
+
+```{r}
+k <- knn_cv %>% 
+  collect_metrics() %>% 
+  filter(.metric == "accuracy") %>% 
+  filter(mean == max(mean)) %>% 
+  pull(neighbors)
+
+knn_spec2 <- 
+  nearest_neighbor() %>%
+  set_args(neighbors = k) %>% 
+  set_engine(engine = 'kknn') %>%
+  set_mode('classification')
+
+knn_wf2 <- workflow() %>%
+  add_model(knn_spec2) %>% 
+  add_recipe(rec_c)
+
+knn_fit <- fit(knn_wf2, titanic_c)
+
+knn_output <- knn_fit %>%
+  predict(new_data = titanic_c) %>%
+  bind_cols(titanic_c)
+
+knn_confusion <- knn_output %>% 
+  conf_mat(truth = Survived, estimate= .pred_class)
+
+helper_confusion(knn_confusion)
+```
+
+## Evaluation (RF, DT, KNN)
+
+```{r}
+cbind(RF = helper_confusion(rf_confusion)) %>% 
+  cbind(DT = helper_confusion(dt_confusion)) %>% 
+  cbind(KNN = helper_confusion(knn_confusion))
 ```
 
 
@@ -143,6 +247,225 @@ rec_r <- recipe(Fare ~ ., data = titanic_r) %>%
 titanic_r_cv5 <- vfold_cv(titanic_r, v = 5)
 ```
 
+## OLS
+
+```{r}
+# model spec for OLS
+lm_spec <-
+  linear_reg() %>%
+  set_engine(engine = "lm") %>%
+  set_mode("regression")
+
+# workflow for OLS
+lm_wf <- workflow() %>%
+  add_recipe(rec_r) %>%
+  add_model(lm_spec) 
+```
+
+```{r}
+# Fit the OLS model
+lm_fit <- fit(lm_wf, titanic_r)
+```
+
+```{r}
+# Present the OLS model result and its metrics
+tidy(lm_fit)
+glance(lm_fit)
+```
+
+```{r}
+#  Calculate and collect CV metrics for OLS
+lm_cv <- fit_resamples(lm_wf,
+                             resamples = titanic_r_cv5,
+                             metrics = metric_set(rmse, rsq, mae))
+
+collect_metrics(lm_cv)
+```
+
+```{r}
+# Visualize the residual plot for OLS
+lm_output <- lm_fit %>%
+  predict(new_data = titanic_r) %>%
+  bind_cols(titanic_r) %>%
+  mutate(resid = Fare - .pred)
+
+ggplot(lm_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+## LASSO
+
+```{r}
+# model spec for LASSO
+lasso_spec <-
+  linear_reg() %>%
+  set_args(mixture = 1, penalty = tune()) %>%
+  set_engine(engine = 'glmnet') %>%
+  set_mode('regression') 
+
+# workflows for LASSO
+lasso_wf <- workflow() %>%
+  add_recipe(rec_r) %>%
+  add_model(lasso_spec)
+```
+
+```{r}
+# Fit the LASSO model
+lasso_fit <- lasso_wf %>%
+  fit(data = titanic_r)
+```
+
+```{r}
+# Tune the LASSO model
+glmnet_output <-
+  lasso_fit %>% extract_fit_parsnip() %>% pluck('fit')
+
+lambdas <- glmnet_output$lambda
+
+coefs_lambdas <-
+  coefficients(glmnet_output, s = lambdas)  %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(lambda = lambdas) %>%
+  select(lambda, everything(),-`(Intercept)`) %>%
+  pivot_longer(cols = -lambda,
+               names_to = "term",
+               values_to = "coef") %>%
+  mutate(var = map_chr(stringr::str_split(term, "_"),  ~ .[1]))
+
+coefs_lambdas %>%
+  ggplot(aes(
+    x = lambda,
+    y = coef,
+    group = term,
+    color = var
+  )) +
+  geom_line() +
+  theme_classic() +
+  theme(legend.position = "bottom", legend.text = element_text(size = 8))
+```
+
+```{r}
+# Visualize the best penalty term
+penalty_grid <- grid_regular(penalty(range = c(-3, 3)),
+                             levels = 20)
+
+lasso_cv <- tune_grid(
+  lasso_wf,
+  resamples = titanic_r_cv5,
+  metrics = metric_set(rmse, mae, rsq),
+  grid = penalty_grid
+)
+
+autoplot(lasso_cv) + theme_classic()
+```
+
+```{r}
+# Present the LASSO model result
+best_penalty <- select_best(lasso_cv, metric = 'rmse')
+lasso_wf2 <- finalize_workflow(lasso_wf, best_penalty)
+lasso_fit <- fit(lasso_wf2, data = titanic_r)
+tidy(lasso_fit)
+```
+
+```{r}
+#  Calculate and collect CV metrics for LASSO
+lasso_output <- lasso_cv %>% collect_metrics(summarize = TRUE) %>%
+  na.omit() %>% 
+  group_by(.metric) %>% 
+  summarize(mean = mean(mean))
+lasso_output
+```
+
+```{r}
+# Visualize the residual plot for LASSO
+lasso_model_output <- lasso_fit %>%
+  predict(new_data = titanic_r) %>%
+  bind_cols(titanic_r) %>%
+  mutate(resid = Fare - .pred)
+
+ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+## GAMs
+
+```{r}
+# GAM model using mgcv
+gam_spec <-
+  gen_additive_mod() %>%
+  set_engine(engine = 'mgcv') %>%
+  set_mode('regression')
+
+gam_mod <- fit(gam_spec,
+               Fare ~ Survived + Pclass + SibSp + Parch + Sex + Embarked + s(Age),
+               data = Titanic_clean)
+```
+
+```{r}
+# Present the GAM model result
+gam_mod %>% pluck('fit') %>% summary() 
+```
+
+```{r}
+# Visualize the evaluation plots for GAMs
+par(mfrow = c(2, 3))
+gam_mod %>% pluck('fit') %>% mgcv::gam.check()
+gam_mod %>% pluck('fit') %>% plot()
+```
+
+```{r}
+# Visualize the residual plot for GAMs
+gam_mod_output <- Titanic_clean %>%
+  bind_cols(predict(gam_mod, new_data = Titanic_clean)) %>%
+  mutate(resid = Fare - .pred)
+
+ggplot(gam_mod_output, aes(x = Age, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_mod_output, aes(x = Parch, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_mod_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+```{r}
+#  Calculate and collect CV metrics for GAMs
+spline_lm_spec <-
+  linear_reg() %>%
+  set_engine(engine = 'lm') %>%
+  set_mode('regression')
+
+spline_rec <- data_rec %>%
+  step_naomit(all_numeric_predictors(), skip = FALSE) %>%
+  step_ns(Age, deg_free = 2.694)
+
+spline_wf <- workflow() %>%
+  add_model(spline_lm_spec) %>%
+  add_recipe(spline_rec)
+
+gam_result_5 <- fit_resamples(spline_wf,
+              resamples = Titanic_clean_5,
+              metrics = metric_set(mae, rmse, rsq))
+
+gam_result_5 %>% collect_metrics()
+```
 
 
 
