@@ -16,6 +16,7 @@ library(tidymodels)
 tidymodels_prefer()
 library(vip)
 library(ranger)
+library(rpart.plot)
 
 set.seed(123)
 
@@ -117,10 +118,37 @@ rf_OOB_output(Titanic_fit, Titanic_clean %>% pull(Survived)) %>%
 
 ## DECISION TREE
 
-```{r}
 
+```{r}
+ct_spec <- decision_tree() %>%
+  set_engine(engine = 'rpart') %>%
+  set_args(cost_complexity = NULL,  #default is 0.01 (used for pruning a tree)
+           min_n = NULL, #min number of observations to try split: default is 20 [I think the documentation has a typo and says 2]  (used to stop early)
+           tree_depth = NULL) %>% #max depth (max number of splits to get to any final group: default is 30 (used to stop early)
+  set_mode('classification') # change this for regression tree
 ```
 
+```{r}
+titan_rec <- recipe(Survived ~ ., data = Titanic_clean) %>%
+  #step_unknown(all_nominal_predictors()) %>%
+  step_novel(all_nominal_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
+titan_wf <- workflow() %>%
+  add_model(ct_spec) %>%
+  add_recipe(titan_rec)
+```
+
+```{r}
+titan_fit <- titan_wf %>%
+  fit(data = Titanic_clean)
+```
+
+```{r}
+titan_fit %>%
+  extract_fit_engine() %>%
+  rpart.plot()
+```
 
 
 
