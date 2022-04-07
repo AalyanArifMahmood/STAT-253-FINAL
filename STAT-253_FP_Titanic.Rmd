@@ -8,16 +8,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-# library statements 
 library(readr)
 library(ggplot2)
 library(dplyr)
 library(tidymodels)
 library(vip)
 library(ranger)
-<<<<<<< HEAD
+
 library(rpart.plot)
-=======
 library(broom)
 library(e1071)
 library(caTools)
@@ -25,26 +23,24 @@ library(class)
 
 tidymodels_prefer()
 theme_set(theme_bw())
->>>>>>> a9ad5d42c5f391703323a877d4de2874412fa557
+
 
 set.seed(123)
 
-# read in data
 Titanic <- read_csv("Data/train.csv")
 ```
 
 ```{r}
-# data cleaning
+
 Titanic_clean <- Titanic %>% 
   select(Survived, Pclass, Sex, Age, SibSp, Parch, Fare, Embarked) %>% 
     na.omit()
 
 Titanic_clean
 
-# creation of cv folds
 Titanic_clean_5 <- vfold_cv(Titanic_clean, v = 5)
 
-# recipes
+
 data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
   step_nzv(all_predictors()) %>% 
   step_normalize(all_numeric_predictors()) %>% 
@@ -57,15 +53,14 @@ data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
 ## RANDOM FOREST
 
 ```{r}
-# Model Specification
 rf_spec <- rand_forest() %>%
   set_engine(engine = 'ranger') %>% 
-  set_args(mtry = NULL, # size of random subset of variables; default is floor(sqrt(number of total predictors))
-           trees = 100, # Number of trees
+  set_args(mtry = NULL,
+           trees = 100, 
            min_n = 2,
-           probability = FALSE, # FALSE: get hard predictions (not needed for regression)
-           importance = 'impurity') %>% # we'll come back to this at the end
-  set_mode('classification') # change this for regression
+           probability = FALSE,
+           importance = 'impurity') %>% 
+  set_mode('classification') 
 ```
 
 ```{r}
@@ -76,14 +71,13 @@ Titanic_clean <-Titanic_clean %>%
 ```{r}
 titanic_rec <- recipe(Survived ~ ., data = Titanic_clean)
 
-# Workflows
 titanic_wf_2 <- workflow() %>%
   add_model(rf_spec %>% set_args(mtry = 2)) %>%
   add_recipe(titanic_rec)
 ```
 
 ```{r}
-set.seed(123) # make sure to run this before each fit so that you have the same 1000 trees
+set.seed(123)
 Titanic_fit <- fit(titanic_wf_2, data = Titanic_clean)
 ```
 
@@ -95,7 +89,6 @@ rf_OOB_output <- function(fit_model, truth){
       )
 }
 
-#check out the function output
 rf_output <- rf_OOB_output(Titanic_fit, Titanic_clean %>% pull(Survived))
 ```
 
@@ -107,7 +100,7 @@ data_rf_OOB_output <-  rf_output %>%
 
 ```{r}
 titanic_output2 <- titanic_wf_2 %>% 
-  update_model(rf_spec %>% set_args(importance = "permutation")) %>% #based on permutation
+  update_model(rf_spec %>% set_args(importance = "permutation")) %>% 
   fit(data = Titanic_clean) %>% 
     extract_fit_engine() 
 
@@ -124,21 +117,43 @@ rf_OOB_output(Titanic_fit, Titanic_clean %>% pull(Survived)) %>%
     conf_mat(truth = class, estimate= .pred_class)
 ```
 
+```{r}
+#Accuracy:
+(383+202)/(383+202+86+41)
+
+#Specificity:
+(202)/(202+86)
+
+#Sensitivity:
+(383)/(383+41)
+```
+
+
+### Discussion about Random Forest Classification:
+
+> To evaluate the Random Forest model, we utilized OOB evaluation to avoid the computational intensity of Cross Validation in this case. Based on the results of the OOB evaluation, we output a confusion matrix to get the values of metrics such as accuracy, sensitivity and specificity.
+
+> The goals of using Random Forest were to observe the variable importances of the many factors that could have affected the likelihood of survival of a particular passenger.
+
+> Conclusion for RF: The model generally shows an acceptable performance with more than 82% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, as the false negatives in our result are rather high (at 86), for which reason the specificity is relatively lower. This means that our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
+
+
+
+
 ## DECISION TREE
 
 
 ```{r}
 ct_spec <- decision_tree() %>%
   set_engine(engine = 'rpart') %>%
-  set_args(cost_complexity = NULL,  #default is 0.01 (used for pruning a tree)
-           min_n = NULL, #min number of observations to try split: default is 20 [I think the documentation has a typo and says 2]  (used to stop early)
-           tree_depth = NULL) %>% #max depth (max number of splits to get to any final group: default is 30 (used to stop early)
-  set_mode('classification') # change this for regression tree
+  set_args(cost_complexity = NULL,
+           min_n = NULL,
+           tree_depth = NULL) %>%
+  set_mode('classification') 
 ```
 
 ```{r}
 titan_rec <- recipe(Survived ~ ., data = Titanic_clean) %>%
-  #step_unknown(all_nominal_predictors()) %>%
   step_novel(all_nominal_predictors()) %>%
   step_dummy(all_nominal_predictors())
 
@@ -147,7 +162,6 @@ titan_wf <- workflow() %>%
   add_recipe(titan_rec)
 ```
 
-<<<<<<< HEAD
 ```{r}
 titan_fit <- titan_wf %>%
   fit(data = Titanic_clean)
@@ -192,7 +206,6 @@ penalty_grid <- grid_regular(
 knn_fit_cv <- tune_grid(knn_wf,
                         resamples = Titanic_clean_52,
                         grid = penalty_grid)
->>>>>>> a9ad5d42c5f391703323a877d4de2874412fa557
 
 knn_fit_cv %>% 
   collect_metrics()
