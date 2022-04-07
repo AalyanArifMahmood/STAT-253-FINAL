@@ -18,7 +18,6 @@ library(vip)
 library(ranger)
 library(rpart.plot)
 library(broom)
-library(caret)
 
 tidymodels_prefer()
 theme_set(theme_bw())
@@ -45,6 +44,15 @@ titanic_c <- Titanic_clean %>%
   mutate(Survived = as.factor(Survived))
 
 rec_c <- recipe(Survived ~ ., data = titanic_c)
+```
+
+```{r}
+# Helper method to calculate Sens, Spec, and Accu
+helper_confusion <- function(x) {
+  return(list("Sensitivty" = x$table[1] / (x$table[1] + x$table[2]),
+              "Specificity" = x$table[4] / (x$table[3] + x$table[4]),
+              "Accuracy" = (x$table[1] + x$table[4]) / (x$table[1] + x$table[2] + x$table[3] + x$table[4])))
+}
 ```
 
 ## Random Forest
@@ -105,8 +113,20 @@ rf_confusion
 ```
 
 ```{r}
-
+helper_confusion(rf_confusion)
 ```
+
+## Decision Tree
+
+```{r}
+dt_spec <- decision_tree() %>%
+  set_engine(engine = 'rpart') %>%
+  set_args(cost_complexity = NULL,
+           min_n = NULL,
+           tree_depth = NULL) %>%
+  set_mode('classification') 
+```
+
 
 # Regression
 
