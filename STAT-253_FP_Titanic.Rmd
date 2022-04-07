@@ -13,10 +13,19 @@ library(readr)
 library(ggplot2)
 library(dplyr)
 library(tidymodels)
-tidymodels_prefer()
 library(vip)
 library(ranger)
+<<<<<<< HEAD
 library(rpart.plot)
+=======
+library(broom)
+library(e1071)
+library(caTools)
+library(class)
+
+tidymodels_prefer()
+theme_set(theme_bw())
+>>>>>>> a9ad5d42c5f391703323a877d4de2874412fa557
 
 set.seed(123)
 
@@ -43,10 +52,11 @@ data_rec <- recipe(Fare ~ ., data = Titanic_clean) %>%
   step_corr(all_numeric_predictors())
 ```
 
-## Classification (RANDOM FOREST)
+# Classification
+
+## RANDOM FOREST
 
 ```{r}
-set.seed(123)
 # Model Specification
 rf_spec <- rand_forest() %>%
   set_engine(engine = 'ranger') %>% 
@@ -63,7 +73,6 @@ Titanic_clean <-Titanic_clean %>%
   mutate(Survived = as.factor(Survived))
 ```
 
-
 ```{r}
 titanic_rec <- recipe(Survived ~ ., data = Titanic_clean)
 
@@ -72,7 +81,6 @@ titanic_wf_2 <- workflow() %>%
   add_model(rf_spec %>% set_args(mtry = 2)) %>%
   add_recipe(titanic_rec)
 ```
-
 
 ```{r}
 set.seed(123) # make sure to run this before each fit so that you have the same 1000 trees
@@ -139,6 +147,7 @@ titan_wf <- workflow() %>%
   add_recipe(titan_rec)
 ```
 
+<<<<<<< HEAD
 ```{r}
 titan_fit <- titan_wf %>%
   fit(data = Titanic_clean)
@@ -149,12 +158,50 @@ titan_fit %>%
   extract_fit_engine() %>%
   rpart.plot()
 ```
+=======
+## KNN
+
+```{r}
+# Model Specification
+knn_spec <- 
+  nearest_neighbor() %>%
+  set_args(neighbors = tune()) %>% 
+  set_engine(engine = 'kknn') %>%
+  set_mode('classification') 
+
+# Recipe
+data_rec2 <- recipe(Survived ~ ., data = Titanic_clean) %>%
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_corr(all_numeric_predictors())
+
+# Workflow (Recipe + Model)
+knn_wf <- workflow() %>%
+  add_model(knn_spec) %>% 
+  add_recipe(data_rec)
+```
+
+```{r}
+Titanic_clean_52 <- vfold_cv(Titanic_clean, v = 5)
+
+penalty_grid <- grid_regular(
+  neighbors(range = c(1, 100)),
+  levels = 20)
+
+knn_fit_cv <- tune_grid(knn_wf,
+                        resamples = Titanic_clean_52,
+                        grid = penalty_grid)
+>>>>>>> a9ad5d42c5f391703323a877d4de2874412fa557
+
+knn_fit_cv %>% 
+  collect_metrics()
+```
 
 
+# Regression
 
-
-### 1. Initial investigation: ignoring nonlinearity
-#### For OLS
+## OLS
 
 ```{r}
 # model spec for OLS
@@ -203,7 +250,7 @@ ggplot(lm_model_output, aes(x = .pred, y = resid)) +
   theme_classic()
 ```
 
-#### For LASSO
+## LASSO
 
 ```{r}
 # model spec for LASSO
@@ -301,24 +348,7 @@ ggplot(lasso_model_output, aes(x = .pred, y = resid)) +
   theme_classic()
 ```
 
-#### Evaluation (OLS and LASSO)
-
-```{r}
-# CV metrics for OLS
-lm_result_5 %>% 
-  collect_metrics()
-
-# CV metrics for LASSO
-lasso_result_5
-```
-
-The ticket class is obviously the most important variable, for the reason that for both OLS and LASSO, it has the smallest p-value and is the last variable come to zero when penalty increases. The outcome is similar to what we expect and the reality suggests, as people with higher ticket class definitely pays more for the ticket price.
-
-By comparing the CV results for two models, we can see that the OLS model has lower MAE and RMSE and higher $R^2$ than the LASSO model, which indicates that we prefer OLS over LASSO to predict Fare for this dataset.
-
-### 2. Accounting for nonlinearity
-
-#### GAMs 
+## GAMs
 
 ```{r}
 # GAM model using mgcv
@@ -390,11 +420,7 @@ gam_result_5 <- fit_resamples(spline_wf,
 gam_result_5 %>% collect_metrics()
 ```
 
-#### Evaluation (GAMs)
-
-From the GAM model result, considering the p-values for predictors, we can see that the important variables are Pclass, Parch, EmbarkedS, and SibSp, which correspond to those of LASSO and OLS models from the Investigation 1. However, the most relevant predictor does not change when accounting for nonlinearity, as it is a categorical variable.
-
-From the GAM output plots for each predictor, we can see that Age does a great job as the blue and red lines overlap. However, Age is not an important variable in the model. Thus, the expected model performance between the GAM model and linear models would not change a lot.
+# Evaluation
 
 ```{r}
 # CV metrics for OLS
@@ -408,15 +434,6 @@ lasso_result_5
 gam_result_5 %>% 
   collect_metrics()
 ```
-
-The MAE and RMSE values for the GAM model are lower than those of the OLS model and LASSO model, and the $R^2$ value for the GAM model is 0.4317564, which is slightly greater. This is reasonable as we make Age non-linear, but it is not an important predictor to the model and it would not largely affect the model result.
-
-
-### 3. Summarize investigations 
-We would go with the GAMs model, as it has lower RMSE and MAE and higher $R^2$. THe inerpretability of three models are all good. However, the predict accuracies of three models seem not to be reliable as the RMSE values for all models are quite high, considering the scale of the response variable.
-
-### 4. Societal impact
-They currently don't show any visible harms. Given the nature of the dataset, there seems to be no caution when we communicate our work.
 
 ```{r}
 # RF from the internet
