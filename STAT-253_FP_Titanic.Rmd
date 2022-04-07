@@ -179,6 +179,7 @@ dc_model_output <- titan_fit %>%
 dc_model_output %>% 
   conf_mat(truth = Survived, estimate= .pred_class)
 ```
+
 ### Evaluating Tree
 
 ```{r}
@@ -333,7 +334,9 @@ knn_model_output %>%
 (393)/(393+31)
 ```
 
+> To evaluate the KNN model, we utilized CV to select the best tuning parameters. Based on the results shown in the graph above, we select k = 21 for the number of neighbors. Then, we get the prediction based on KNN model for k = 21, and calculate the metrics.
 
+> Conclusion for KNN: The model generally shows an acceptable performance with more than 87% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, , for which reason the specificity is relatively lower. This means that, similar to RF, our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
 
 # Regression
 
