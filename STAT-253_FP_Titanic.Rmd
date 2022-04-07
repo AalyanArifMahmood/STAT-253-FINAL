@@ -171,8 +171,27 @@ titan_fit <- titan_wf %>%
 titan_fit %>%
   extract_fit_engine() %>%
   rpart.plot()
+
+dc_model_output <- titan_fit %>% 
+  predict(new_data = Titanic_clean) %>%
+  bind_cols(Titanic_clean)
+
+dc_model_output %>% 
+  conf_mat(truth = Survived, estimate= .pred_class)
 ```
-=======
+
+```{r}
+#Accuracy:
+(401+198)/(401+198+90+23)
+
+#Specificity:
+(198)/(198+90)
+
+#Sensitivity:
+(401)/(401+23)
+```
+
+
 ## KNN
 
 ```{r}
@@ -193,7 +212,7 @@ data_rec2 <- recipe(Survived ~ ., data = Titanic_clean) %>%
 # Workflow (Recipe + Model)
 knn_wf <- workflow() %>%
   add_model(knn_spec) %>% 
-  add_recipe(data_rec)
+  add_recipe(data_rec2)
 ```
 
 ```{r}
@@ -208,8 +227,51 @@ knn_fit_cv <- tune_grid(knn_wf,
                         grid = penalty_grid)
 
 knn_fit_cv %>% 
-  collect_metrics()
+  collect_metrics() %>% 
+  ggplot(aes(x = neighbors,
+             y = mean,
+             color = .metric)) +
+  geom_line()
 ```
+
+```{r}
+k <- knn_fit_cv %>% 
+  collect_metrics() %>% 
+  filter(.metric == "accuracy") %>% 
+  filter(mean == max(mean)) %>% 
+  pull(neighbors)
+
+knn_spec2 <- 
+  nearest_neighbor() %>%
+  set_args(neighbors = k) %>% 
+  set_engine(engine = 'kknn') %>%
+  set_mode('classification')
+
+knn_wf2 <- workflow() %>%
+  add_model(knn_spec2) %>% 
+  add_recipe(data_rec2)
+
+fit_knn_model <- fit(knn_wf2, Titanic_clean)
+
+knn_model_output <- fit_knn_model %>%
+  predict(new_data = Titanic_clean) %>%
+  bind_cols(Titanic_clean)
+
+knn_model_output %>% 
+  conf_mat(truth = Survived, estimate= .pred_class)
+```
+
+```{r}
+#Accuracy:
+(393+227)/(393+227+31+61)
+
+#Specificity:
+(227)/(227+61)
+
+#Sensitivity:
+(393)/(393+31)
+```
+
 
 
 # Regression
