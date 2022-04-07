@@ -241,19 +241,6 @@ tune_res %>%
 ```
 
 
-
-```{r}
-#Accuracy:
-(401+198)/(401+198+90+23)
-
-#Specificity:
-(198)/(198+90)
-
-#Sensitivity:
-(401)/(401+23)
-```
-
-
 ## KNN
 
 ```{r}
@@ -337,6 +324,11 @@ knn_model_output %>%
 > To evaluate the KNN model, we utilized CV to select the best tuning parameters. Based on the results shown in the graph above, we select k = 21 for the number of neighbors. Then, we get the prediction based on KNN model for k = 21, and calculate the metrics.
 
 > Conclusion for KNN: The model generally shows an acceptable performance with more than 87% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, , for which reason the specificity is relatively lower. This means that, similar to RF, our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
+
+
+## Comparison between KNN Classification and Random Forest Classification
+
+> Using accuracy (cross validated in case of KNN and OOB in case of RF) as our metric (since in this context, sensitivity and specificity are equally important), we see that KNN classification performs better than Random forest as it yields a larger accuracy than RF. However, it is important to note that KNN Classification is more prone to overfitting than RF, and should we fit both models to unseen data, we may observe superior performance from RF. 
 
 # Regression
 
