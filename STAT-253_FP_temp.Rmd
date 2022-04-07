@@ -1,0 +1,129 @@
+---
+title: "STAT-253_FP_temp"
+author: "STAT 253"
+date: "4/7/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidymodels)
+library(vip)
+library(ranger)
+library(rpart.plot)
+library(broom)
+library(caret)
+
+tidymodels_prefer()
+theme_set(theme_bw())
+
+set.seed(123)
+
+Titanic <- read_csv("Data/train.csv")
+```
+
+```{r}
+# Data Cleaning
+Titanic_clean <- Titanic %>% 
+  select(Survived, Pclass, Sex, Age, SibSp, Parch, Fare, Embarked) %>% 
+    na.omit()
+
+Titanic_clean
+```
+
+# Classification
+
+```{r}
+# Process the data and make the recipe for classification
+titanic_c <- Titanic_clean %>%
+  mutate(Survived = as.factor(Survived))
+
+rec_c <- recipe(Survived ~ ., data = titanic_c)
+```
+
+## Random Forest
+
+```{r}
+rf_spec <- rand_forest() %>%
+  set_engine(engine = 'ranger') %>%
+  set_args(
+    mtry = NULL,
+    trees = 100,
+    min_n = 2,
+    probability = FALSE,
+    importance = 'impurity'
+  ) %>%
+  set_mode('classification')
+
+rf_wf <- workflow() %>%
+  add_model(rf_spec %>% set_args(mtry = 2)) %>%
+  add_recipe(rec_c)
+```
+
+```{r}
+rf_fit <- fit(rf_wf, data = titanic_c)
+```
+
+```{r}
+rf_OOB_output <- function(fit_model, truth) {
+  tibble(
+    .pred_class = fit_model %>% extract_fit_engine() %>% pluck('predictions'),
+    #OOB predictions
+    class = truth
+  )
+}
+
+rf_output <- rf_OOB_output(rf_fit, titanic_c %>% pull(Survived))
+
+rf_OOB <- rf_output %>%
+  accuracy(truth = class, estimate = .pred_class)
+```
+
+```{r}
+rf_output2 <- rf_wf %>%
+  update_model(rf_spec %>% set_args(importance = "permutation")) %>%
+  fit(data = titanic_c) %>%
+  extract_fit_engine()
+
+rf_output2 %>%
+  vip(num_features = 30) + theme_classic()
+
+rf_output2 %>% vip::vi() %>% head()
+rf_output2 %>% vip::vi() %>% tail()
+```
+
+```{r}
+rf_confusion <- rf_OOB_output(rf_fit, titanic_c %>% pull(Survived)) %>%
+  conf_mat(truth = class, estimate = .pred_class)
+rf_confusion
+```
+
+```{r}
+
+```
+
+# Regression
+
+```{r}
+# Process the data and make the recipe for regression
+titanic_r <- Titanic_clean
+
+rec_r <- recipe(Fare ~ ., data = titanic_r) %>%
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_corr(all_numeric_predictors())
+
+titanic_r_cv5 <- vfold_cv(titanic_r, v = 5)
+```
+
+
+
+
+
