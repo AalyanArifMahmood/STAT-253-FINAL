@@ -18,6 +18,7 @@ library(ggplot2)
 library(dplyr)
 library(tidymodels)
 library(TTR)
+library(pracma)
 tidymodels_prefer()
 set.seed(123)
 # read in data
@@ -54,6 +55,8 @@ Stock_clean <- Stock_clean %>%
 ```{r}
 Stock_clean <- Stock_clean %>% 
   mutate(rsi = RSI(Close, n=14)) %>% 
+  mutate(ATR = ATR(Stock_clean[,c("High", "Low", "Close")], n=14)) %>%
+  mutate(EMA = movavg(Stock_clean$Open, n=14, type='e')) %>%
   na.omit()
 ```
 
