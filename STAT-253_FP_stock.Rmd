@@ -60,6 +60,28 @@ Stock_clean <- Stock_clean %>%
   na.omit()
 ```
 
+
+```{r}
+next_day_open <- Stock_clean %>%
+  select("Open")
+
+next_day_open <- next_day_open %>%
+  slice(-1)
+
+next_day_open <- next_day_open %>%
+  rename(nextDayOpen = Open)
+```
+
+```{r}
+Stock_clean <- head(Stock_clean, -1)
+  
+```
+
+```{r}
+Stock_clean <- cbind(Stock_clean, next_day_open)
+```
+
+
 ```{r}
 # creation of cv folds
 Stock_clean_5 <- vfold_cv(Stock_clean, v = 5)
@@ -71,6 +93,7 @@ lm_spec <-
     linear_reg() %>%
     set_engine(engine = "lm") %>% 
     set_mode("regression")
+
 lm_lasso_spec <- 
   linear_reg() %>%
   set_args(mixture = 1, penalty = tune()) %>%
@@ -80,7 +103,7 @@ lm_lasso_spec <-
 
 ```{r}
 # recipes
-data_rec <- recipe(Close ~ Date + Open + High + Low + rsi, data = Stock_clean) %>%
+data_rec <- recipe(nextDayOpen ~ rsi+ATR+EMA, data = Stock_clean) %>%
   step_nzv(all_predictors()) %>%
   step_normalize(all_numeric_predictors())
   #step_corr(all_numeric_predictors())
