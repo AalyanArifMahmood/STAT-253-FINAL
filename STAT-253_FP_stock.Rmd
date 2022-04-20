@@ -55,7 +55,7 @@ Stock_clean <- Stock_clean %>%
 ```{r}
 Stock_clean <- Stock_clean %>% 
   mutate(rsi = RSI(Close, n=14)) %>% 
-  mutate(ATR = ATR(Stock_clean[,c("High", "Low", "Close")], n=14)) %>%
+  #mutate(ATR = ATR(Stock_clean[,c("High", "Low", "Close")], n=14)) %>%
   mutate(EMA = movavg(Stock_clean$Open, n=14, type='e')) %>%
   na.omit()
 ```
@@ -103,7 +103,7 @@ lm_lasso_spec <-
 
 ```{r}
 # recipes
-data_rec <- recipe(nextDayOpen ~ rsi+ATR+EMA, data = Stock_clean) %>%
+data_rec <- recipe(nextDayOpen ~ rsi+EMA, data = Stock_clean) %>%
   step_nzv(all_predictors()) %>%
   step_normalize(all_numeric_predictors())
   #step_corr(all_numeric_predictors())
@@ -168,3 +168,4 @@ tune_res %>% collect_metrics(summarize = TRUE) %>%
   filter(.metric == "rmse") %>% 
   summarize(mean = mean(mean))
 ```
+
