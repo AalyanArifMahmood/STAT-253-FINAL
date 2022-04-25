@@ -1,12 +1,12 @@
 ---
 title: "STAT-253_Project"
-author: "Yixao Wang"
+author: "Aalyan, Eric"
 date: "2/3/2022"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, tidy = TRUE)
 ```
 
 ```{r}

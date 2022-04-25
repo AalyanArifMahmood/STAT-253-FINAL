@@ -1,15 +1,12 @@
 ---
 title: "STAT-253_FP_temp"
-author: "STAT 253"
+author: "Aalyan, Eric"
 date: "4/7/2022"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, 
-                      warning = FALSE, 
-                      message = FALSE,
-                      eval = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, tidy = TRUE)
 ```
 
 ```{r}
