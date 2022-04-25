@@ -208,3 +208,16 @@ Pokemon_final %>%
   group_by(kclust_4, `Type 1`) %>% 
   summarize(sum = n())
 ```
+
+
+## Insights from the K-Means Clustering approach:
+
+> After choosing the most appropriate value for k (the value at the elbow of the number of clusters plot), we then plotted different variables against each other and formed clusters. Next, we output the number pokemon of each type in each cluster to observe which type was dominant in a particular field (e.g best attacker would be one with the highet attack and special attack).
+
+> With all this set up, we observed that the strogest attacker type was, unsurprisingly, Dragon as dragin types were in the highest quantity in the cluster 1 of attack vs Sp. Attack. The weakest type here was bug.
+
+> Next, when looking at the best defensive ability, we observed that the best type for defense (i.e in most quantity in cluster 2 for defense vs sp. defense) was rock or steel, and this is rather consistent with previous assumptions as Pokemon such as Aggron (A rock and steel type) boast a really high defense base stat. The weakest again here was bug type.
+
+> Lastly, we wanted to see which type would be the most tanky, in the sense that it can sustain an attack (high defense) and can take a lot of hits (high hp stat), and the cluster and visualization for this suggested that Normal types had a good balance of both these statistics (observed from cluster 3), and we can think of Pokemon which back this resukt up (such as Snorlax). 
+
+> Therefore as a final insight, we were able to use K-Means clustering to form the perfect Pokemon team, which would consist of a Dragon type (such as Salamence), a tanky normal type such as Snorlax to hold off opponents which we cannot combat with super effective moves, a rock type (and preferably steel dual type) to sustain hits, and then a mix of other types such as psychic which also boasts high attack. However, our strategy shows us very clearly that bug types ar to be aboided, and that is also the general consensus in the Pokemon community.
