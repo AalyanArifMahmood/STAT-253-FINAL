@@ -11,6 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+set.seed(123)
 ```
 
 ```{r}
@@ -30,18 +34,177 @@ Pokemon_final <- Pokemon_721 %>%
 
 ```{r}
 Pokemon_final %>% 
-  filter(!is.na(catch_rate)) %>% 
-  mutate(n = 1) %>% 
-  group_by(`Type 1`) %>% 
-  summarize(sum_n = sum(n),
-            avg_total = sum(Total) / sum_n,
-            avg_catch_rate = sum(catch_rate) / sum_n) %>% 
-  ungroup() %>% 
-  ggplot(aes(x = avg_catch_rate,
-             y = avg_total,
-             color = `Type 1`)) +
+  ggplot(aes(x = Attack,
+             y = `Sp. Atk`)) +
+  geom_point()
+
+Pokemon_final %>% 
+  ggplot(aes(x = Defense,
+             y = `Sp. Def`)) +
   geom_point()
 ```
 
 
+```{r}
+Pokemon_1 <- Pokemon_final %>% 
+  select(Attack, `Sp. Atk`)
+```
 
+```{r}
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_1), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+```
+
+```{r}
+kclust_1_k4 <- kmeans(Pokemon_1, centers = 4)
+Pokemon_1 <- Pokemon_1 %>%
+    mutate(kclust_4 = factor(kclust_1_k4$cluster))
+
+Pokemon_1 %>% 
+  ggplot(aes(x = Attack,
+             y = `Sp. Atk`,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_1_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+```{r}
+Pokemon_2 <- Pokemon_final %>% 
+  select(Defense, `Sp. Def`)
+
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_2), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+
+kclust_2_k4 <- kmeans(Pokemon_2, centers = 4)
+Pokemon_2 <- Pokemon_2 %>%
+    mutate(kclust_4 = factor(kclust_2_k4$cluster))
+
+Pokemon_2 %>% 
+  ggplot(aes(x = Defense,
+             y = `Sp. Def`,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_2_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+```{r}
+Pokemon_3 <- Pokemon_final %>% 
+  select(`Sp. Atk`, Speed)
+
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_3), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+
+kclust_3_k4 <- kmeans(Pokemon_3, centers = 4)
+Pokemon_3 <- Pokemon_3 %>%
+    mutate(kclust_4 = factor(kclust_3_k4$cluster))
+
+Pokemon_3 %>% 
+  ggplot(aes(x = `Sp. Atk`,
+             y = Speed,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_3_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+```{r}
+Pokemon_4 <- Pokemon_final %>% 
+  select(Defense, HP)
+
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_4), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+
+kclust_4_k4 <- kmeans(Pokemon_4, centers = 4)
+Pokemon_4 <- Pokemon_4 %>%
+    mutate(kclust_4 = factor(kclust_4_k4$cluster))
+
+Pokemon_4 %>% 
+  ggplot(aes(x = Defense,
+             y = HP,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_4_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
