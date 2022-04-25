@@ -294,6 +294,9 @@ regreDF <- lm_output %>%
 regreDF
 ```
 
+### Interpretation
+
+We use OLS, LASSO, and GAMs as our regression models. In general, we want to predict the credit card limit for different users.  
 
 
 
