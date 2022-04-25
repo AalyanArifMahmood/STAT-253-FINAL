@@ -1,0 +1,47 @@
+---
+title: "STAT-253_Project"
+author: "Yixao Wang"
+date: "2/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+Pokemon_890 <- read_csv("Data/pokedex_(Update_05.20).csv") %>% 
+  mutate(Name = name) %>% 
+  select(-name)
+Pokemon_721 <- read_csv("Data/Pokemon.csv")
+```
+
+```{r}
+Pokemon_final <- Pokemon_721 %>% 
+  left_join(Pokemon_890,
+            by = "Name") %>% 
+  select(c("#", Name, `Type 1`, `Type 2`, Total, HP, Attack, Defense, `Sp. Atk`, `Sp. Def`, Speed, Generation, Legendary, status, species, height_m, weight_kg, abilities_number, catch_rate, base_friendship, growth_rate)) %>% 
+  distinct()
+```
+
+```{r}
+Pokemon_final %>% 
+  filter(!is.na(catch_rate)) %>% 
+  mutate(n = 1) %>% 
+  group_by(`Type 1`) %>% 
+  summarize(sum_n = sum(n),
+            avg_total = sum(Total) / sum_n,
+            avg_catch_rate = sum(catch_rate) / sum_n) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = avg_catch_rate,
+             y = avg_total,
+             color = `Type 1`)) +
+  geom_point()
+```
+
+
+

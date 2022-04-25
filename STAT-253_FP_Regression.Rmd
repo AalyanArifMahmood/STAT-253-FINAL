@@ -30,20 +30,13 @@ theme_set(theme_bw())
 
 set.seed(123)
 
-Credit <- data("Credit")
-```
-
-```{r}
-Credit %>% 
-  ggplot(aes(x = Limit,
-             y = Rating)) +
-  geom_point()
+data("Credit")
 ```
 
 ```{r}
 # Data Cleaning
 Credit <- Credit %>% 
-  select(-ID)
+  select(-ID, -Rating)
 
 # Process the data and make the recipe for regression
 rec_r <- recipe(Limit ~ ., data = Credit) %>%
@@ -211,14 +204,96 @@ gam_spec <-
   set_mode('regression')
 
 gam_mod <- fit(gam_spec,
-               Credit ~ Survived + Pclass + SibSp + Parch + Sex + Embarked + s(Age),
-               data = titanic_r)
+               Limit ~ s(Income) + Cards + Age + Education + Gender + Student + Married + Ethnicity + s(Balance),
+               data = Credit)
 ```
 
 ```{r}
 # Present the GAM model result
 gam_mod %>% pluck('fit') %>% summary() 
 ```
+
+```{r}
+# Visualize the evaluation plots for GAMs
+par(mfrow = c(2, 3))
+gam_mod %>% pluck('fit') %>% mgcv::gam.check()
+gam_mod %>% pluck('fit') %>% plot()
+```
+
+```{r}
+# Visualize the residual plot for GAMs
+gam_output <- Credit %>%
+  bind_cols(predict(gam_mod, new_data = Credit)) %>%
+  mutate(resid = Limit - .pred)
+
+ggplot(gam_output, aes(x = Income, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_output, aes(x = Education, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_output, aes(x = Balance, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+```{r}
+#  Calculate and collect CV metrics for GAMs
+gam_spec2 <-
+  linear_reg() %>%
+  set_engine(engine = 'lm') %>%
+  set_mode('regression')
+
+gam_rec <- rec_r %>%
+  step_naomit(all_numeric_predictors(), skip = FALSE) %>%
+  step_ns(Income, deg_free = 1.481) %>% 
+  step_ns(Balance, deg_free = 8.426)
+
+gam_wf <- workflow() %>%
+  add_model(gam_spec2) %>%
+  add_recipe(gam_rec)
+
+gam_output <- fit_resamples(gam_wf,
+                            resamples = Credit_cv5,
+                            metrics = metric_set(mae, rmse, rsq))
+
+gam_output %>% collect_metrics()
+```
+
+### Evaluation (OLS, LASSO, GAMs)
+
+```{r}
+regreDF <- lm_output %>%
+  collect_metrics() %>% 
+  mutate(OLS = mean) %>% 
+  select(.metric, OLS) %>% 
+  left_join(lasso_output %>% 
+              mutate(LASSO = mean) %>% 
+              select(.metric, LASSO), 
+            by = ".metric") %>% 
+  left_join(gam_output %>% 
+              collect_metrics() %>% 
+              mutate(GAMs = mean) %>% 
+              select(.metric, GAMs), 
+            by = ".metric")
+
+regreDF
+```
+
 
 
 
