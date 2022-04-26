@@ -1,0 +1,69 @@
+---
+title: "STAT-253_Final"
+author: "Aalyan Mahmood, Eric Wang"
+date: "4/26/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, warning = FALSE, message = FALSE, tidy = TRUE)
+```
+
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidymodels)
+library(vip)
+library(ranger)
+library(rpart.plot)
+library(broom)
+library(kknn)
+library(glmnet)
+library(ISLR)
+
+tidymodels_prefer()
+theme_set(theme_bw())
+
+set.seed(123)
+```
+
+## Part 1: Regression
+
+### Data Context
+
+### Research Questions
+
+```{r}
+
+```
+
+## Part 2: Classification
+
+### Data Context
+
+### Research Questions
+
+```{r}
+
+```
+
+## Part 3: Clustering
+
+### Data Context
+
+### Research Questions
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
