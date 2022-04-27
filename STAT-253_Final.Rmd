@@ -30,13 +30,337 @@ set.seed(123)
 
 ## Part 1: Regression
 
-### Data Context
-
-### Research Questions
+### 1 Data Context
 
 ```{r}
+data("Credit")
 
+# Data Cleaning
+Credit <- Credit %>% 
+  na.omit() %>% 
+  select(-ID, -Rating)
+head(Credit)
 ```
+
+For regression part, we use a simulated data set containing information on 400 customers. In this dataset:
+
+  + `Income` is the individual's income in $1,000's
+  + `Limit` is the credit limit
+  + `Cards` is the number of credit cards
+  + `Age` is the age in years
+  + `Education` is the number of years of eduction
+  + `Gender` is a factor with levels Male and Female
+  + `Student` is a factor with levels No and Yes indicating whether the individual was a student
+  + `Married` is a factor with levels No and Yes indicating whether the individual was married
+  + `Ethnicity` is a factor with levels African American, Asian, and Caucasian indicating the individual's ethnicity
+  + `Balance` is the average credit card balance in dollar
+  
+The dataset is simulated data, with thanks to Albert Kim for pointing out that this was omitted, and supplying the data and man documentation page on Oct 19, 2017.
+
+### 2 Research Questions
+
+We fit regression models to predict individual's credict limit in dollar.
+
+```{r}
+# Visualize the outcome variable
+Credit %>% 
+  ggplot(aes(x = Limit)) + 
+  geom_histogram()
+```
+
+
+### 3 Methods
+
+```{r}
+# Process the data and make the recipe for regression
+rec_r <- recipe(Limit ~ ., data = Credit) %>%
+  step_nzv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_corr(all_numeric_predictors())
+
+Credit_cv5 <- vfold_cv(Credit, v = 5)
+```
+
+#### 3.1 OLS
+
+```{r}
+# model spec for OLS
+lm_spec <-
+  linear_reg() %>%
+  set_engine(engine = "lm") %>%
+  set_mode("regression")
+
+# workflow for OLS
+lm_wf <- workflow() %>%
+  add_recipe(rec_r) %>%
+  add_model(lm_spec) 
+```
+
+```{r}
+# Fit the OLS model
+lm_fit <- fit(lm_wf, Credit)
+```
+
+```{r}
+# Present the OLS model result and its metrics
+tidy(lm_fit)
+glance(lm_fit)
+```
+
+```{r}
+#  Calculate and collect CV metrics for OLS
+lm_output <- fit_resamples(lm_wf,
+                           resamples = Credit_cv5,
+                           metrics = metric_set(rmse, rsq, mae))
+
+collect_metrics(lm_output)
+```
+
+```{r}
+# Visualize the residual plot for OLS
+lm_output2 <- lm_fit %>%
+  predict(new_data = Credit) %>%
+  bind_cols(Credit) %>%
+  mutate(resid = Limit - .pred)
+
+ggplot(lm_output2, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+The first model we use is ordinary least square (linear regression). Based on 5-folds cross-validation, we get MAE(272.707), RMSE(365.188), $R^2$(0.975). Overall, as the range of the outcome value `Limit` is quite large (over 10000), MAE and RMSE for this model are not very large. Also, the $R^2$ indicates that the model has a good performance in predicting the outcome. 
+
+We also use a residual plot to visualize the prediction. However, we can see that points are not randomly positioned on the plot, and there is still a significant difference between the red line and blue line. The residual plot shows that there the model is not good enough in general.
+
+#### 3.2 LASSO
+
+```{r}
+# model spec for LASSO
+lasso_spec <-
+  linear_reg() %>%
+  set_args(mixture = 1, penalty = tune()) %>%
+  set_engine(engine = 'glmnet') %>%
+  set_mode('regression') 
+
+# workflows for LASSO
+lasso_wf <- workflow() %>%
+  add_recipe(rec_r) %>%
+  add_model(lasso_spec)
+```
+
+```{r}
+# Fit the LASSO model
+lasso_fit <- lasso_wf %>%
+  fit(data = Credit)
+```
+
+```{r}
+# Tune the LASSO model
+glmnet_output <-
+  lasso_fit %>% extract_fit_parsnip() %>% pluck('fit')
+
+lambdas <- glmnet_output$lambda
+
+coefs_lambdas <-
+  coefficients(glmnet_output, s = lambdas)  %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(lambda = lambdas) %>%
+  select(lambda, everything(),-`(Intercept)`) %>%
+  pivot_longer(cols = -lambda,
+               names_to = "term",
+               values_to = "coef") %>%
+  mutate(var = map_chr(stringr::str_split(term, "_"),  ~ .[1]))
+
+coefs_lambdas %>%
+  ggplot(aes(
+    x = lambda,
+    y = coef,
+    group = term,
+    color = var
+  )) +
+  geom_line() +
+  theme_classic() +
+  theme(legend.position = "bottom", legend.text = element_text(size = 8))
+```
+
+```{r}
+# Visualize the best penalty term
+penalty_grid <- grid_regular(penalty(range = c(-3, 3)),
+                             levels = 20)
+
+lasso_cv <- tune_grid(
+  lasso_wf,
+  resamples = Credit_cv5,
+  metrics = metric_set(rmse, mae, rsq),
+  grid = penalty_grid
+)
+
+autoplot(lasso_cv) + theme_classic()
+```
+
+```{r}
+# Present the LASSO model result
+best_penalty <- select_best(lasso_cv, metric = 'rmse')
+lasso_wf2 <- finalize_workflow(lasso_wf, best_penalty)
+lasso_fit <- fit(lasso_wf2, data = Credit)
+tidy(lasso_fit)
+```
+
+```{r}
+#  Calculate and collect CV metrics for LASSO
+lasso_output <- lasso_cv %>% collect_metrics(summarize = TRUE) %>%
+  na.omit() %>% 
+  group_by(.metric) %>% 
+  summarize(mean = mean(mean))
+lasso_output
+```
+
+```{r}
+# Visualize the residual plot for LASSO
+lasso_output2 <- lasso_fit %>%
+  predict(new_data = Credit) %>%
+  bind_cols(Credit) %>%
+  mutate(resid = Limit - .pred)
+
+ggplot(lasso_output2, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+The next method we use is LASSO. We plot a path graph for all the parameters. The longer it takes for the variable to become zero, the more important it is in the model. Thus, the graph shows that the most important variable is `Balance`, and the least important variables are `Gender` and `Ethnicity`. 
+
+Next, we plot three graphs with the amount of regularization on the x-axis and statistics metrics on the y-axis. We then select the penalty number based on the best RMSE and fit the final model. We evaluate the model with MAE(337.641), RMSE(446.247), and $R^2$(0.970). In general, MAE and RMSE are not large, and $R^2$ is quite high.
+
+We also make a residual plot to evaluate the model. Same to OLS, points are not randomly scattered around, and there is still a large difference between the blue and red lines.
+
+#### 3.3 GAMs
+
+```{r}
+# GAM model using mgcv
+gam_spec <-
+  gen_additive_mod() %>%
+  set_engine(engine = 'mgcv') %>%
+  set_mode('regression')
+
+gam_mod <- fit(gam_spec,
+               Limit ~ s(Income) + Cards + Age + Education + Gender + Student + Married + Ethnicity + s(Balance),
+               data = Credit)
+```
+
+```{r}
+# Present the GAM model result
+gam_mod %>% pluck('fit') %>% summary() 
+```
+
+```{r}
+# Visualize the evaluation plots for GAMs
+par(mfrow = c(2, 3))
+gam_mod %>% pluck('fit') %>% mgcv::gam.check()
+gam_mod %>% pluck('fit') %>% plot()
+```
+
+```{r}
+# Visualize the residual plot for GAMs
+gam_output <- Credit %>%
+  bind_cols(predict(gam_mod, new_data = Credit)) %>%
+  mutate(resid = Limit - .pred)
+
+ggplot(gam_output, aes(x = Income, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_output, aes(x = Education, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_output, aes(x = Balance, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+
+ggplot(gam_output, aes(x = .pred, y = resid)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0, color = "red") +
+  theme_classic()
+```
+
+```{r}
+#  Calculate and collect CV metrics for GAMs
+gam_spec2 <-
+  linear_reg() %>%
+  set_engine(engine = 'lm') %>%
+  set_mode('regression')
+
+gam_rec <- rec_r %>%
+  step_naomit(all_numeric_predictors(), skip = FALSE) %>%
+  step_ns(Income, deg_free = 1.481) %>% 
+  step_ns(Balance, deg_free = 8.426)
+
+gam_wf <- workflow() %>%
+  add_model(gam_spec2) %>%
+  add_recipe(gam_rec)
+
+gam_output <- fit_resamples(gam_wf,
+                            resamples = Credit_cv5,
+                            metrics = metric_set(mae, rmse, rsq))
+
+gam_output %>% collect_metrics()
+```
+
+The third model we use is GAMs. We add splines to `Income`, `Education`, and `Balance`. We use "mgcv" engine to find the best edf and plot several graphs to see the results. We can see from those plots that GAMs work quite well. Especially for the last one, the residual plot, the blue and red lines basically overlap. It indicates that the model fits well. 
+
+Based on the variable importance shown by the GAMs model output, `Cards` and `Student` are the most important variables, while `Married`, `Gender`, and `Ethnicity` are the least important variables.
+
+From the perspective of metrics, MAE(149.967), RMSE(249.692), and $R^2$(0.988) show that the model has a good performance and compared to the previous two methods, it has a quite large improvement. 
+
+### 4 Evaluations
+
+**Compare the different models in light of evaluation metrics, plots, variable importance, and data context.**
+
+```{r}
+regreDF <- lm_output %>%
+  collect_metrics() %>% 
+  mutate(OLS = mean) %>% 
+  select(.metric, OLS) %>% 
+  left_join(lasso_output %>% 
+              mutate(LASSO = mean) %>% 
+              select(.metric, LASSO), 
+            by = ".metric") %>% 
+  left_join(gam_output %>% 
+              collect_metrics() %>% 
+              mutate(GAMs = mean) %>% 
+              select(.metric, GAMs), 
+            by = ".metric")
+
+regreDF
+```
+
+The residual plots for OLS and LASSO are quite similar, while that for GAMs shows a better performance. For the evaluation metrics based on 5-folds cross-validation, LASSO has the highest MAE and RMSE and the lowest $R^2$, and GAMs achieves the lowest MAE and RMSE and the highest $R^2$. Thus, the final model we choose the GAMs model.
+
+**Show and interpret some representative examples of residual plots for your final model. Does the model show acceptable results in terms of any systematic biases? Maybe Randomness of scatters?**
+
+### 5 Conclusions
+
+```{r}
+gam_mod %>% pluck('fit') %>% summary() 
+```
+
+**Interpret you final model (show plots of estimated non-linear functions, or slope coefficients) for important predictors, and provide some general interpretations of what you learn from these: negative or positive coefficients?**
+**Interpret evaluation metric(s) for the final model in context with units. Does the model show an acceptable amount of error?: meaning of MAE, RMSE, RSQ**
+**Summarization should show evidence of acknowledging the data context in thinking about the sensibility of these results. Sensibility??**
 
 ## Part 2: Classification
 
