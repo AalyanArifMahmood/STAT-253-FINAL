@@ -456,6 +456,153 @@ helper_confusion <- function(x) {
 
 #### 3.1 Random Forest
 
+```{r}
+# model spec for RF
+rf_spec <- rand_forest() %>%
+  set_engine(engine = 'ranger') %>%
+  set_args(
+    mtry = NULL,
+    trees = 100,
+    min_n = 2,
+    probability = FALSE,
+    importance = 'impurity'
+  ) %>%
+  set_mode('classification')
+
+# workflow for RF
+rf_wf <- workflow() %>%
+  add_model(rf_spec %>% set_args(mtry = 2)) %>%
+  add_recipe(rec_c)
+```
+
+```{r}
+# Fit the model
+rf_fit <- fit(rf_wf, data = titanic_c)
+```
+
+```{r}
+# Get the OOB output
+rf_OOB_output <- function(fit_model, truth) {
+  tibble(
+    .pred_class = fit_model %>% extract_fit_engine() %>% pluck('predictions'),
+    #OOB predictions
+    class = truth
+  )
+}
+
+rf_output <- rf_OOB_output(rf_fit, titanic_c %>% pull(Survived))
+
+rf_OOB <- rf_output %>%
+  accuracy(truth = class, estimate = .pred_class)
+```
+
+```{r}
+rf_output2 <- rf_wf %>%
+  update_model(rf_spec %>% set_args(importance = "permutation")) %>%
+  fit(data = titanic_c) %>%
+  extract_fit_engine()
+
+rf_output2 %>%
+  vip(num_features = 30) + theme_classic()
+```
+
+```{r}
+rf_output2 %>% vip::vi() %>% head()
+rf_output2 %>% vip::vi() %>% tail()
+```
+
+```{r}
+rf_confusion <- rf_OOB_output(rf_fit, titanic_c %>% pull(Survived)) %>%
+  conf_mat(truth = class, estimate = .pred_class)
+rf_confusion
+```
+
+```{r}
+helper_confusion(rf_confusion)
+```
+
+The first classification model we use is random forest.
+
+To evaluate the Random Forest model, we utilized OOB evaluation to avoid the computational intensity of cross-validation in this case. Based on the results of the OOB evaluation, we output a confusion matrix to get the values of metrics such as accuracy, sensitivity and specificity. The goals of using Random Forest were to observe the variable importance of the many factors that could have affected the likelihood of survival of a particular passenger. 
+
+Conclusion for RF: The model generally shows an acceptable performance with more than 82% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, as the false negatives in our result are rather high (at 86), for which reason the specificity is relatively lower. This means that our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
+
+#### 3.2 KNN
+
+```{r}
+knn_spec <- 
+  nearest_neighbor() %>%
+  set_args(neighbors = tune()) %>% 
+  set_engine(engine = 'kknn') %>%
+  set_mode('classification') 
+
+knn_wf <- workflow() %>%
+  add_model(knn_spec) %>% 
+  add_recipe(rec_c)
+```
+
+```{r}
+penalty_grid <- grid_regular(neighbors(range = c(1, 100)),
+                             levels = 20)
+
+knn_cv <- tune_grid(knn_wf,
+                    resamples = titanic_c_cv5,
+                    grid = penalty_grid)
+
+knn_cv %>%
+  collect_metrics() %>%
+  ggplot(aes(x = neighbors,
+             y = mean,
+             color = .metric)) +
+  geom_line()
+```
+
+```{r}
+k <- knn_cv %>% 
+  collect_metrics() %>% 
+  filter(.metric == "accuracy") %>% 
+  filter(mean == max(mean)) %>% 
+  pull(neighbors)
+
+knn_spec2 <- 
+  nearest_neighbor() %>%
+  set_args(neighbors = k) %>% 
+  set_engine(engine = 'kknn') %>%
+  set_mode('classification')
+
+knn_wf2 <- workflow() %>%
+  add_model(knn_spec2) %>% 
+  add_recipe(rec_c)
+
+knn_fit <- fit(knn_wf2, titanic_c)
+
+knn_output <- knn_fit %>%
+  predict(new_data = titanic_c) %>%
+  bind_cols(titanic_c)
+
+knn_confusion <- knn_output %>% 
+  conf_mat(truth = Survived, estimate= .pred_class)
+
+helper_confusion(knn_confusion)
+```
+
+The second classification model we use is KNN. 
+
+To evaluate the KNN model, we utilized CV to select the best tuning parameters. Based on the results shown in the graph above, we select k = 21 for the number of neighbors. Then, we get the prediction based on KNN model for k = 21, and calculate the metrics. 
+
+Conclusion for KNN: The model generally shows an acceptable performance with more than 87% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, , for which reason the specificity is relatively lower. This means that, similar to RF, our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
+
+### 4 Evaluation
+
+```{r}
+cbind(RF = helper_confusion(rf_confusion)) %>% 
+  cbind(KNN = helper_confusion(knn_confusion))
+```
+
+Using accuracy (cross validated in case of KNN and OOB in case of RF) as our metric (since in this context, sensitivity and specificity are equally important), we see that KNN classification performs better than Random forest as it yields a larger accuracy than RF. However, it is important to note that KNN Classification is more prone to overfitting than RF, and should we fit both models to unseen data, we may observe superior performance from RF.(**Need More**)
+
+### 5 Conclusion
+
 
 
 
