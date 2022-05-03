@@ -59,7 +59,7 @@ The dataset is simulated data, with thanks to Albert Kim for pointing out that t
 
 ### 2 Research Questions
 
-We fit regression models to predict individual's credict limit in dollar.
+We fit regression models to predict individual's credit limit in dollar. The graph below is the distribution of `Limit`.
 
 ```{r}
 # Visualize the outcome variable
@@ -67,7 +67,6 @@ Credit %>%
   ggplot(aes(x = Limit)) + 
   geom_histogram()
 ```
-
 
 ### 3 Methods
 
