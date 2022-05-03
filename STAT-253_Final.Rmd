@@ -40,6 +40,9 @@ Credit <- Credit %>%
   na.omit() %>% 
   select(-ID, -Rating)
 head(Credit)
+
+# Create k5 CV for the data
+Credit_cv5 <- vfold_cv(Credit, v = 5)
 ```
 
 For regression part, we use a simulated data set containing information on 400 customers. In this dataset:
@@ -77,8 +80,6 @@ rec_r <- recipe(Limit ~ ., data = Credit) %>%
   step_normalize(all_numeric_predictors()) %>% 
   step_dummy(all_nominal_predictors()) %>% 
   step_corr(all_numeric_predictors())
-
-Credit_cv5 <- vfold_cv(Credit, v = 5)
 ```
 
 #### 3.1 OLS
@@ -130,7 +131,9 @@ ggplot(lm_output2, aes(x = .pred, y = resid)) +
   theme_classic()
 ```
 
-The first model we use is ordinary least square (linear regression). Based on 5-folds cross-validation, we get MAE(272.707), RMSE(365.188), $R^2$(0.975). Overall, as the range of the outcome value `Limit` is quite large (over 10000), MAE and RMSE for this model are not very large. Also, the $R^2$ indicates that the model has a good performance in predicting the outcome. 
+The first model we use is ordinary least square (linear regression). 
+
+Based on 5-folds cross-validation, we get MAE(272.707), RMSE(365.188), $R^2$(0.975). Overall, as the range of the outcome value `Limit` is quite large (over 10000), MAE and RMSE for this model are not very large. Also, the $R^2$ indicates that the model has a good performance in predicting the outcome. 
 
 We also use a residual plot to visualize the prediction. However, we can see that points are not randomly positioned on the plot, and there is still a significant difference between the red line and blue line. The residual plot shows that there the model is not good enough in general.
 
@@ -215,7 +218,7 @@ tidy(lasso_fit)
 lasso_output <- lasso_cv %>% collect_metrics(summarize = TRUE) %>%
   na.omit() %>% 
   group_by(.metric) %>% 
-  summarize(mean = mean(mean))
+  summarize(mean = mean(mean), std_err = mean(std_err))
 lasso_output
 ```
 
@@ -233,7 +236,9 @@ ggplot(lasso_output2, aes(x = .pred, y = resid)) +
   theme_classic()
 ```
 
-The next method we use is LASSO. We plot a path graph for all the parameters. The longer it takes for the variable to become zero, the more important it is in the model. Thus, the graph shows that the most important variable is `Balance`, and the least important variables are `Gender` and `Ethnicity`. 
+The next method we use is LASSO. 
+
+We plot a path graph for all the parameters. The longer it takes for the variable to become zero, the more important it is in the model. Thus, the graph shows that the most important variable is `Balance`, and the least important variables are `Gender` and `Ethnicity`. 
 
 Next, we plot three graphs with the amount of regularization on the x-axis and statistics metrics on the y-axis. We then select the penalty number based on the best RMSE and fit the final model. We evaluate the model with MAE(337.641), RMSE(446.247), and $R^2$(0.970). In general, MAE and RMSE are not large, and $R^2$ is quite high.
 
@@ -256,6 +261,14 @@ gam_mod <- fit(gam_spec,
 ```{r}
 # Present the GAM model result
 gam_mod %>% pluck('fit') %>% summary() 
+```
+
+```{r}
+# Compare the result with the linear GAMs model
+gam_mod_temp <- fit(gam_spec,
+               Limit ~ Income + Cards + Age + Education + Gender + Student + Married + Ethnicity + Balance,
+               data = Credit)
+gam_mod_temp %>% pluck('fit') %>% summary() 
 ```
 
 ```{r}
@@ -319,37 +332,46 @@ gam_output <- fit_resamples(gam_wf,
 gam_output %>% collect_metrics()
 ```
 
-The third model we use is GAMs. We add splines to `Income`, `Education`, and `Balance`. We use "mgcv" engine to find the best edf and plot several graphs to see the results. We can see from those plots that GAMs work quite well. Especially for the last one, the residual plot, the blue and red lines basically overlap. It indicates that the model fits well. 
+The third model we use is GAMs. 
 
-Based on the variable importance shown by the GAMs model output, `Cards` and `Student` are the most important variables, while `Married`, `Gender`, and `Ethnicity` are the least important variables.
+There are five numerical variables in the model: `Cards`, `Age`, `Education`, `Income`, and `Balance`, but the first three variables are essentially categorical variables, which are only expressed in numerical form. Therefore, we add splines to `Income`, `Education`, and `Balance`. Compared to the linear GAMs model, we can see the $R^2$ and deviance explained both increase, which means the added splines are effective.
+
+We use "mgcv" engine to find the best edf and plot several graphs to see the results. We can see from those plots that GAMs work quite well. Especially for the last one, the residual plot, the blue and red lines basically overlap. It indicates that the model fits well. Based on the variable importance shown by the GAMs model output, `Cards` and `Student` are the most important variables, while `Married`, `Gender`, and `Ethnicity` are the least important variables.
 
 From the perspective of metrics, MAE(149.967), RMSE(249.692), and $R^2$(0.988) show that the model has a good performance and compared to the previous two methods, it has a quite large improvement. 
 
 ### 4 Evaluations
 
-**Compare the different models in light of evaluation metrics, plots, variable importance, and data context.**
-
 ```{r}
 regreDF <- lm_output %>%
   collect_metrics() %>% 
-  mutate(OLS = mean) %>% 
-  select(.metric, OLS) %>% 
+  mutate(OLS = mean,
+         OLS_std = std_err) %>% 
+  select(.metric, OLS, OLS_std) %>% 
   left_join(lasso_output %>% 
-              mutate(LASSO = mean) %>% 
-              select(.metric, LASSO), 
+              mutate(LASSO = mean,
+                     LASSO_std = std_err) %>% 
+              select(.metric, LASSO, LASSO_std), 
             by = ".metric") %>% 
   left_join(gam_output %>% 
               collect_metrics() %>% 
-              mutate(GAMs = mean) %>% 
-              select(.metric, GAMs), 
+              mutate(GAMs = mean,
+                     GAMs_std = std_err) %>% 
+              select(.metric, GAMs, GAMs_std), 
             by = ".metric")
 
 regreDF
 ```
 
-The residual plots for OLS and LASSO are quite similar, while that for GAMs shows a better performance. For the evaluation metrics based on 5-folds cross-validation, LASSO has the highest MAE and RMSE and the lowest $R^2$, and GAMs achieves the lowest MAE and RMSE and the highest $R^2$. Thus, the final model we choose the GAMs model.
+For the evaluation metrics based on 5-folds cross-validation, LASSO has the highest MAE and RMSE and the lowest $R^2$, and GAMs achieve the lowest MAE and RMSE and the highest $R^2$. (**Broadly summarize conclusions from looking at these CV evaluation metrics and their measures of uncertainty.**)
 
-**Show and interpret some representative examples of residual plots for your final model. Does the model show acceptable results in terms of any systematic biases? Maybe Randomness of scatters?**
+The residual plots for OLS and LASSO are quite similar, while that for GAMs shows a better performance, as the blue line and red line overlap more in the residual plot of the GAMs model. 
+
+From the perspective of variable importance, the importance sequence (from high to low) for LASSO is `Balance`, `Income`, `Student`, and `Cards`, while `s(Balance)`, `s(Income)`, and `StudentYes` have the same variable importance in the GAMs model. Both the two sequences are reasonable intuitively. In reality, balance and income are two important indicators for credit card limits. Also, if a person is a student, that person is less able to repay the money, which means he or she is more likely to get a lower credit card limit.
+
+(**Show and interpret some representative examples of residual plots for your final model. Does the model show acceptable results in terms of any systematic biases?**)
+
+Thus, the final model we choose is the GAMs model.
 
 ### 5 Conclusions
 
