@@ -45,18 +45,18 @@ head(Credit)
 Credit_cv5 <- vfold_cv(Credit, v = 5)
 ```
 
-For regression part, we use a simulated data set containing information on 400 customers. In this dataset:
+For the regression part, we use a simulated data set containing information on 400 customers. In this dataset:
 
-  + `Income` is the individual's income in $1,000's
-  + `Limit` is the credit limit
-  + `Cards` is the number of credit cards
-  + `Age` is the age in years
-  + `Education` is the number of years of eduction
-  + `Gender` is a factor with levels Male and Female
-  + `Student` is a factor with levels No and Yes indicating whether the individual was a student
-  + `Married` is a factor with levels No and Yes indicating whether the individual was married
-  + `Ethnicity` is a factor with levels African American, Asian, and Caucasian indicating the individual's ethnicity
-  + `Balance` is the average credit card balance in dollar
++ `Income`: the individual's income in $1,000's
++ `Limiti`: the credit limit
++ `Cards`: the number of credit cards
++ `Age`: the age in years
++ `Education`: the number of years of eduction
++ `Gender`: a factor with levels Male and Female
++ `Student`: a factor with levels No and Yes indicating whether the individual was a student
++ `Married`: a factor with levels No and Yes indicating whether the individual was married
++ `Ethnicity`: a factor with levels African American, Asian, and Caucasian indicating the individual's ethnicity
++ `Balance`: the average credit card balance in dollar
   
 The dataset is simulated data, with thanks to Albert Kim for pointing out that this was omitted, and supplying the data and man documentation page on Oct 19, 2017.
 
@@ -385,13 +385,79 @@ gam_mod %>% pluck('fit') %>% summary()
 
 ## Part 2: Classification
 
-### Data Context
-
-### Research Questions
+### 1 Data Context
 
 ```{r}
+Titanic <- read_csv("Data/train.csv")
 
+# Data Cleaning
+Titanic_clean <- Titanic %>% 
+  select(Survived, Pclass, Sex, Age, SibSp, Parch, Fare, Embarked) %>% 
+    na.omit()
+head(Titanic_clean)
+
+# Create k5 CV for the data
+titanic_c_cv5 <- vfold_cv(Titanic_clean, v = 5)
 ```
+
+For the classification part, we use the [Titanic dataset](https://www.kaggle.com/c/titanic). This data set is basic information about the passengers on the Titanic. In this dataset:
+
++ `Survived`: if the passenger is survival(0 = No, 1 = Yes)
++ `Pclass`: the ticket class(1 = 1st, 2 = 2nd, 3 = 3rd)
++ `Sex`: the gender of the passenger
++ `Age`: age in years
++ `SibSp`: the number of siblings / spouses aboard the Titanic
++ `Parch`: the number of parents / children aboard the Titanic
++ `Fare`: the passenger fare
++ `Embarked`: the port of Embarkation(C = Cherbourg, Q = Queenstown, S = Southampton)
+
+The dataset is from Kaggle.
+
+### 2 Research Questions
+
+(From Kaggle:) On April 15, 1912, during her maiden voyage, the widely considered “unsinkable” RMS Titanic sank after colliding with an iceberg. Unfortunately, there weren’t enough lifeboats for everyone onboard, resulting in the death of 1502 out of 2224 passengers and crew.
+
+While there was some element of luck involved in surviving, it seems some groups of people were more likely to survive than others.
+
+In this challenge, we want to build a classification model that answers the question: “what sorts of people were more likely to survive?” using the dataset. The graph below is the distribution of `Survived`.
+
+```{r}
+# Visualize the outcome variable
+Titanic_clean %>% 
+  ggplot(aes(x = as.factor(Survived))) + 
+  geom_bar() +
+  xlab("Survived")
+```
+
+### 3 Methods
+
+```{r}
+# Process the data and make the recipe for classification
+titanic_c <- Titanic_clean %>%
+  mutate(Survived = as.factor(Survived))
+
+rec_c <- recipe(Survived ~ ., data = titanic_c) %>%
+  step_nzv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_corr(all_numeric_predictors())
+```
+
+```{r}
+# Helper method to calculate Sensitivity, Specificity, and Accuracy
+helper_confusion <- function(x) {
+  return(list(
+    "Sensitivty" = x$table[1] / (x$table[1] + x$table[2]),
+    "Specificity" = x$table[4] / (x$table[3] + x$table[4]),
+    "Accuracy" = (x$table[1] + x$table[4]) / (x$table[1] + x$table[2] + x$table[3] + x$table[4])
+  ))
+}
+```
+
+#### 3.1 Random Forest
+
+
+
 
 ## Part 3: Clustering
 
