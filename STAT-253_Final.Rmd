@@ -394,6 +394,7 @@ Titanic_clean <- Titanic %>%
     na.omit()
 head(Titanic_clean)
 
+set.seed(123)
 ```
 
 For the classification part, we use the [Titanic dataset](https://www.kaggle.com/c/titanic). This data set is basic information about the passengers on the Titanic. In this dataset:
@@ -525,7 +526,7 @@ The first classification model we use is random forest.
 
 To evaluate the Random Forest model, we utilized OOB evaluation to avoid the computational intensity of cross-validation in this case. Based on the results of the OOB evaluation, we output a confusion matrix to get the values of metrics such as accuracy, sensitivity and specificity. The goals of using Random Forest were to observe the variable importance of the many factors that could have affected the likelihood of survival of a particular passenger. 
 
-Conclusion for RF: The model generally shows an acceptable performance with more than 81.3% accuracy. The model does a good job at predicting the correct/real outcome. We do note that the model does do relatively poorly at predicting those who survived, as the false negatives in our result are rather high (at 91), for which reason the specificity is relatively lower at 0.68. This means that our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
+Conclusion for RF: The model generally shows an acceptable performance with more than 80.76% accuracy. The model does a good job at predicting the correct/real outcome. We do note that the model does do relatively poorly at predicting those who survived, as the false negatives in our result are rather high (at 98), for which reason the specificity is relatively lower at 0.6597. This means that our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
 
 #### 3.2 KNN
 
@@ -588,7 +589,7 @@ helper_confusion(knn_confusion)
 
 The second classification model we use is KNN. 
 
-To evaluate the KNN model, we utilized CV to select the best tuning parameters. Based on the results shown in the graph above, we select k = 21 for the number of neighbors. Then, we get the prediction based on KNN model for k = 21, and calculate the metrics. 
+To evaluate the KNN model, we utilized CV to select the best tuning parameters. Based on the results shown in the graph above, we select $k = 21$ for the number of neighbors. Then, we get the prediction based on KNN model for $k = 21$, and calculate the metrics. 
 
 Conclusion for KNN: The model generally shows an acceptable performance with more than 87% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, , for which reason the specificity is relatively lower. This means that, similar to RF, our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
 
@@ -603,21 +604,223 @@ Using accuracy (cross validated in case of KNN and OOB in case of RF) as our met
 
 ### 5 Conclusion
 
-We are persuaded to select KNN classification as our final model but given the above reasoning, vhoosing RF may be a better option in terms of avoiding overfitting. Considering the resulting confusion matrix from RF, we calculate the sensitivity to be 0.899, the specificity to be 0.684 and the accuracy to be 0.812. These metrics indicate to us a strong performance from our model, as stated before in the RF section, but we also acknowledge the weakness of the model in terms of predicting the positive (Survived) outcome. 
+We are persuaded to select KNN classification as our final model but given the above reasoning, vhoosing RF may be a better option in terms of avoiding overfitting. Considering the resulting confusion matrix from RF, we calculate the sensitivity to be 0.908, the specificity to be 0.6597 and the accuracy to be 0.8076. These metrics indicate to us a strong performance from our model, as stated before in the RF section, but we also acknowledge the weakness of the model in terms of predicting the positive (Survived) outcome. 
 The data used is based on real cases from the titanic incident, for which reason the results are sensible, meaning that they do indicate patterns in survival of the real passengers aboard the Titanic, and give us a sense of what feature of a passenger (their class and gender most inportantly, given the variable importance plot) enhanced their chances of survival (a female passenger in first class for example would have higher odds of survival, compared to a male passenger in first class, and a first class passenger would have higher odds of survival than a second or third class passenger).
 
 ## Part 3: Clustering
 
-### Data Context
-
-### Research Questions
+### 1 Data Context
 
 ```{r}
+# Data Cleaning
+Pokemon_890 <- read_csv("Data/pokedex_(Update_05.20).csv") %>% 
+  mutate(Name = name) %>% 
+  select(-name)
+Pokemon_721 <- read_csv("Data/Pokemon.csv")
 
+Pokemon_final <- Pokemon_721 %>% 
+  left_join(Pokemon_890,
+            by = "Name") %>% 
+  select(c(`Type 1`, HP, Attack, Defense, `Sp. Atk`, `Sp. Def`, Speed)) %>% 
+  distinct()
+head(Pokemon_final)
 ```
 
 
+For the clustering part, the datasets we use are about Pokémon, a famous video game presented by Game Freak. The first dataset is from Kaggle([link](https://www.kaggle.com/abcsds/pokemon)) and includes 721 Pokémon, their number, name first and the second type, and basic stats: HP, Attack, Defense, Special Attack, Special Defense, and Speed. The second dataset is also from Kaggle ([link](https://www.kaggle.com/abcsds/pokemon))contains 890 Pokémon, with their English name, Japanese name, German name, the numbered generation in which the Pokémon was first introduced, the status or quality of the Pokémon, species, and their number of types. Two datasets are originally from the Pokémon official website. We combine two datasets based on their shared Pokémon, which means the number of Pokémon for the final dataset would be 721, with all the variables in two original datasets.
 
++ `Type 1`: the type of the Pokémon
++ `HP`: the HP of the Pokémon
++ `Attack`: the attack of the Pokémon
++ `Defense`: the defense of the Pokémon
++ `Sp. Atk`: the special attack of the Pokémon
++ `Sp. Def`: the special defense of the Pokémon
++ `Speed`: the speed of the Pokémon
+
+### 2 Research Questions
+
+With K-Means Clustering, the topic we wanted to address was in regards to team selection. Selecting a diverse and all rounded team is the goal of any player, and so constructing a team by utilizing k-Means Clustering is our aim. Therefore, our research question is: "What Pokemon types perform the best in different aspects of battle, i.e in terms of defense, attack, bulk and speed?" To answer this question, we aim to create different clusters with different attributes (like attack and special attack, etc.) to output the type that displays the highest base statistic points in the field. 
+
+### 3 Clustering
+
+```{r}
+Pokemon_1 <- Pokemon_final %>% 
+  select(Attack, `Sp. Atk`)
+```
+
+```{r}
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_1), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+```
+
+```{r}
+kclust_1_k4 <- kmeans(Pokemon_1, centers = 4)
+Pokemon_1 <- Pokemon_1 %>%
+    mutate(kclust_4 = factor(kclust_1_k4$cluster))
+
+Pokemon_1 %>% 
+  ggplot(aes(x = Attack,
+             y = `Sp. Atk`,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_1_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+```{r}
+Pokemon_2 <- Pokemon_final %>% 
+  select(Defense, `Sp. Def`)
+
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_2), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+
+kclust_2_k4 <- kmeans(Pokemon_2, centers = 4)
+Pokemon_2 <- Pokemon_2 %>%
+    mutate(kclust_4 = factor(kclust_2_k4$cluster))
+
+Pokemon_2 %>% 
+  ggplot(aes(x = Defense,
+             y = `Sp. Def`,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_2_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+```{r}
+Pokemon_3 <- Pokemon_final %>% 
+  select(`Sp. Atk`, Speed)
+
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_3), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+
+kclust_3_k4 <- kmeans(Pokemon_3, centers = 4)
+Pokemon_3 <- Pokemon_3 %>%
+    mutate(kclust_4 = factor(kclust_3_k4$cluster))
+
+Pokemon_3 %>% 
+  ggplot(aes(x = `Sp. Atk`,
+             y = Speed,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_3_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+```{r}
+Pokemon_4 <- Pokemon_final %>% 
+  select(Defense, HP)
+
+# Data-specific function to cluster and calculate total within-cluster SS
+pokemon_cluster_ss <- function(k){
+    # Perform clustering
+    kclust <- kmeans(scale(Pokemon_4), centers = k)
+
+    # Return the total within-cluster sum of squares
+    return(kclust$tot.withinss)
+}
+
+tibble(
+    k = 1:15,
+    tot_wc_ss = purrr::map_dbl(1:15, pokemon_cluster_ss)
+) %>% 
+    ggplot(aes(x = k, y = tot_wc_ss)) +
+    geom_point() + 
+    labs(x = "Number of clusters",y = 'Total within-cluster sum of squares') + 
+    theme_classic()
+
+kclust_4_k4 <- kmeans(Pokemon_4, centers = 4)
+Pokemon_4 <- Pokemon_4 %>%
+    mutate(kclust_4 = factor(kclust_4_k4$cluster))
+
+Pokemon_4 %>% 
+  ggplot(aes(x = Defense,
+             y = HP,
+             color = kclust_4)) +
+  geom_point()
+```
+
+```{r}
+Pokemon_final %>% 
+  mutate(kclust_4 = factor(kclust_4_k4$cluster)) %>% 
+  group_by(kclust_4, `Type 1`) %>% 
+  summarize(sum = n())
+```
+
+### 4 Evaluation
+
+To choose the most appropriate value of k, we created a plot of number of clusters against Total within cluster sum of squares, and chose the value at the elbow of the plot for k, which turned out to be $k=4$.
+
+After choosing the most appropriate value for k (the value at the elbow of the number of clusters plot), we then plotted different variables against each other and formed clusters. Next, we output the number Pokemon of each type in each cluster to observe which type was dominant in a particular field (e.g best attacker would be one with the highest attack and special attack). This means that we selected a different set of 2 variables to explore different characteristics (different set of variables for the distance measure). 
+
+
+With all this set up, we observed that the strongest attacker type was, unsurprisingly, Dragon as dragon types were in the highest quantity in the cluster 1 of Attack vs Sp. Attack. The weakest type here was bug.
+
+Next, when looking at the best defensive ability, we observed that the best type for defense (i.e in most quantity in cluster 2 for Defense vs Sp. defense) was rock or steel, and this is rather consistent with previous assumptions as Pokemon such as Aggron (A rock and steel type) boast a really high defense base stat. The weakest again here was bug type.
+
+Lastly, we wanted to see which type would be the most tanky, in the sense that it can sustain an attack (high defense) and can take a lot of hits (high hp stat), and the cluster and visualization for this suggested that Normal types had a good balance of both these statistics (observed from cluster 3), and we can think of Pokemon which back this result up (such as Snorlax). 
+
+Therefore as a final insight, we were able to use K-Means clustering to form the perfect Pokemon team, which would consist of a Dragon type (such as Salamence), a tanky normal type such as Snorlax to hold off opponents which we cannot combat with super effective moves, a rock type (and preferably steel dual type) to sustain hits, and then a mix of other types such as psychic which also boasts high attack. However, our strategy shows us very clearly that bug types ar to be avoided, and that is also the general consensus in the Pokemon community.
 
 
 
