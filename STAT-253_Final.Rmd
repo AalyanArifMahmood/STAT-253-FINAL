@@ -379,9 +379,7 @@ Thus, the final model we choose is the GAMs model.
 gam_mod %>% pluck('fit') %>% summary() 
 ```
 
-**Interpret you final model (show plots of estimated non-linear functions, or slope coefficients) for important predictors, and provide some general interpretations of what you learn from these: negative or positive coefficients?**
-**Interpret evaluation metric(s) for the final model in context with units. Does the model show an acceptable amount of error?: meaning of MAE, RMSE, RSQ**
-**Summarization should show evidence of acknowledging the data context in thinking about the sensibility of these results. Sensibility??**
+From the outcome above, we can see that our final model have five important indicators. `Intercept`, `Income`, and `Balance` show positive relationships with the final outcome `Limit`, which means a person with more income and balance would have a higher credit card limit. However, `StudentYes` and `Cards` show negative relationships with the outcome, meaning that when a person with more cards and being a student would have lower credit card limit. Mentioned above, the model has quite large MAE and RMSE, but $R^2$ is high, indicating that our model has a high probability to get a correct outcome. As the data is simulated, the model would not have a high sensibility to the real cases.
 
 ## Part 2: Classification
 
@@ -607,8 +605,6 @@ Using accuracy (cross validated in case of KNN and OOB in case of RF) as our met
 
 We are persuaded to select KNN classification as our final model but given the above reasoning, vhoosing RF may be a better option in terms of avoiding overfitting. Considering the resulting confusion matrix from RF, we calculate the sensitivity to be 0.899, the specificity to be 0.684 and the accuracy to be 0.812. These metrics indicate to us a strong performance from our model, as stated before in the RF section, but we also acknowledge the weakness of the model in terms of predicting the positive (Survived) outcome. 
 The data used is based on real cases from the titanic incident, for which reason the results are sensible, meaning that they do indicate patterns in survival of the real passengers aboard the Titanic, and give us a sense of what feature of a passenger (their class and gender most inportantly, given the variable importance plot) enhanced their chances of survival (a female passenger in first class for example would have higher odds of survival, compared to a male passenger in first class, and a first class passenger would have higher odds of survival than a second or third class passenger).
-
-
 
 ## Part 3: Clustering
 
