@@ -48,7 +48,7 @@ Credit_cv5 <- vfold_cv(Credit, v = 5)
 For the regression part, we use a simulated data set containing information on 400 customers. In this dataset:
 
 + `Income`: the individual's income in $1,000's
-+ `Limiti`: the credit limit
++ `Limit`: the credit limit
 + `Cards`: the number of credit cards
 + `Age`: the age in years
 + `Education`: the number of years of eduction
@@ -370,6 +370,8 @@ The residual plots for OLS and LASSO are quite similar, while that for GAMs show
 From the perspective of variable importance, the importance sequence (from high to low) for LASSO is `Balance`, `Income`, `Student`, and `Cards`, while `s(Balance)`, `s(Income)`, and `StudentYes` have the same variable importance in the GAMs model. Both the two sequences are reasonable intuitively. In reality, balance and income are two important indicators for credit card limits. Also, if a person is a student, that person is less able to repay the money, which means he or she is more likely to get a lower credit card limit.
 
 (**Show and interpret some representative examples of residual plots for your final model. Does the model show acceptable results in terms of any systematic biases?**)
+
+Looking at the residual plots of all the models, there does seem to be some systematic bias because most of the residuals are focused in the the region below 6000 in the residual plots for all of our models. Given that the majority of the cases in our dataset are not students, this indicates a rather low income standing in the majority of the cases. 
 
 Thus, the final model we choose is the GAMs model.
 
