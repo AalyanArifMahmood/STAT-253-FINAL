@@ -398,8 +398,6 @@ Titanic_clean <- Titanic %>%
     na.omit()
 head(Titanic_clean)
 
-# Create k5 CV for the data
-titanic_c_cv5 <- vfold_cv(Titanic_clean, v = 5)
 ```
 
 For the classification part, we use the [Titanic dataset](https://www.kaggle.com/c/titanic). This data set is basic information about the passengers on the Titanic. In this dataset:
@@ -443,6 +441,10 @@ rec_c <- recipe(Survived ~ ., data = titanic_c) %>%
   step_normalize(all_numeric_predictors()) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_corr(all_numeric_predictors())
+
+
+# Create k5 CV for the data
+titanic_c_cv5 <- vfold_cv(titanic_c, v = 5)
 ```
 
 ```{r}
@@ -527,7 +529,7 @@ The first classification model we use is random forest.
 
 To evaluate the Random Forest model, we utilized OOB evaluation to avoid the computational intensity of cross-validation in this case. Based on the results of the OOB evaluation, we output a confusion matrix to get the values of metrics such as accuracy, sensitivity and specificity. The goals of using Random Forest were to observe the variable importance of the many factors that could have affected the likelihood of survival of a particular passenger. 
 
-Conclusion for RF: The model generally shows an acceptable performance with more than 82% accuracy. The model does a good job at predicting the correct/real outcome. We do not that the model does do relatively poorly at predicting those who survived, as the false negatives in our result are rather high (at 86), for which reason the specificity is relatively lower. This means that our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
+Conclusion for RF: The model generally shows an acceptable performance with more than 81.3% accuracy. The model does a good job at predicting the correct/real outcome. We do note that the model does do relatively poorly at predicting those who survived, as the false negatives in our result are rather high (at 91), for which reason the specificity is relatively lower at 0.68. This means that our model performs better at predicting the outcome of the passenger that did not survive, in comparison to a passenger who did survive.
 
 #### 3.2 KNN
 
@@ -601,10 +603,12 @@ cbind(RF = helper_confusion(rf_confusion)) %>%
   cbind(KNN = helper_confusion(knn_confusion))
 ```
 
-Using accuracy (cross validated in case of KNN and OOB in case of RF) as our metric (since in this context, sensitivity and specificity are equally important), we see that KNN classification performs better than Random forest as it yields a larger accuracy than RF. However, it is important to note that KNN Classification is more prone to overfitting than RF, and should we fit both models to unseen data, we may observe superior performance from RF.(**Need More**)
+Using accuracy (cross validated in case of KNN and OOB in case of RF) as our metric (since in this context, sensitivity and specificity are equally important), we see that KNN classification performs better than Random forest as it yields a larger accuracy than RF. However, it is important to note that KNN Classification is more prone to overfitting than RF, and should we fit both models to unseen data, we may observe superior performance from RF.
 
 ### 5 Conclusion
 
+We are persuaded to select KNN classification as our final model but given the above reasoning, vhoosing RF may be a better option in terms of avoiding overfitting. Considering the resulting confusion matrix from RF, we calculate the sensitivity to be 0.899, the specificity to be 0.684 and the accuracy to be 0.812. These metrics indicate to us a strong performance from our model, as stated before in the RF section, but we also acknowledge the weakness of the model in terms of predicting the positive (Survived) outcome. 
+The data used is based on real cases from the titanic incident, for which reason the results are sensible, meaning that they do indicate patterns in survival of the real passengers aboard the Titanic, and give us a sense of what feature of a passenger (their class and gender most inportantly, given the variable importance plot) enhanced their chances of survival (a female passenger in first class for example would have higher odds of survival, compared to a male passenger in first class, and a first class passenger would have higher odds of survival than a second or third class passenger).
 
 
 
