@@ -209,6 +209,10 @@ Pokemon_final %>%
   summarize(sum = n())
 ```
 
+## Research question:
+
+With K-Means Clustering, the topic we wanted to address was in regards to team selection. Selecting a diverse and all rounded team is the goal of any player, and so constructing a team by utilizing k-Means Clustering is our aim. Therefore, our research question is: "What Pokemon types perform the best in different aspects of battle, i.e in terms of defense, attack, bulk and speed?" To answer this question, we aim to create different clusters with different attributes (like attack and special attack, etc.) to output the type that displays the highest base statistic points in the field. 
+
 
 ## Insights from the K-Means Clustering approach:
 
