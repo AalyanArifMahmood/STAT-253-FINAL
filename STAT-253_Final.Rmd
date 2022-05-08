@@ -363,13 +363,11 @@ regreDF <- lm_output %>%
 regreDF
 ```
 
-For the evaluation metrics based on 5-folds cross-validation, LASSO has the highest MAE and RMSE and the lowest $R^2$, and GAMs achieve the lowest MAE and RMSE and the highest $R^2$. (**Broadly summarize conclusions from looking at these CV evaluation metrics and their measures of uncertainty.**)
+For the evaluation metrics based on 5-folds cross-validation, LASSO has the highest MAE and RMSE and the lowest $R^2$, and GAMs achieve the lowest MAE and RMSE and the highest $R^2$. The MAEs and RMSEs in this situation are quite large, as the size of the outcome variable `Limit`, and these large metrics indicate that our outcomes have a large uncertainty and could lead to unfair credit card limits.
 
 The residual plots for OLS and LASSO are quite similar, while that for GAMs shows a better performance, as the blue line and red line overlap more in the residual plot of the GAMs model. 
 
 From the perspective of variable importance, the importance sequence (from high to low) for LASSO is `Balance`, `Income`, `Student`, and `Cards`, while `s(Balance)`, `s(Income)`, and `StudentYes` have the same variable importance in the GAMs model. Both the two sequences are reasonable intuitively. In reality, balance and income are two important indicators for credit card limits. Also, if a person is a student, that person is less able to repay the money, which means he or she is more likely to get a lower credit card limit.
-
-(**Show and interpret some representative examples of residual plots for your final model. Does the model show acceptable results in terms of any systematic biases?**)
 
 Looking at the residual plots of all the models, there does seem to be some systematic bias because most of the residuals are focused in the the region below 6000 in the residual plots for all of our models. Given that the majority of the cases in our dataset are not students, this indicates a rather low income standing in the majority of the cases. 
 
